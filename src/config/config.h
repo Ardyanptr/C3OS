@@ -16,6 +16,10 @@
 #define PAGE_SIZE 64
 #define INIT_FLAG_ADDR 0
 
+#define SCREEN_H 64
+#define LINE_H 16
+#define MAX_LINES 16
+
 #define OS_VERSION "b0.1.0"
 #define ESP32_VERSION "1.0.6"
 

@@ -1,51 +1,18 @@
 #include <Arduino.h>
 
+#include "config/config.h"
+#include "config/var_declare.h"
 #include "include/BLEAppLib.h"
 #include "include/ComponentLib.h"
 #include "include/CoreLib.h"
 #include "include/EssentialAppLib.h"
 #include "include/SystemCoreLib.h"
 #include "include/UILib.h"
-
-extern DNSServer dnsServer;
-extern WebServer server;
-
-#define SDA_PIN 4
-#define SCL_PIN 5
-
-#define SCREEN_H 64
-#define LINE_H 16
-#define MAX_LINES 16
-
-#define BUTTON_UP 0
-#define BUTTON_DOWN 1
-#define BUTTON_OK 2
-#define BUTTON_ACTION 3
-
-#define EEPROM_ADDR 0x50
-#define EEPROM_SIZE 32668
-#define PAGE_SIZE 64
-#define INIT_FLAG_ADDR 0
+#include "include/WiFiAppLib.h"
 
 void drawMenu();
 
 RTC_DATA_ATTR boot_mode_t boot_mode = BOOT_NORMAL;
-
-String BOARD_ATTACHED = "ESP32-C3";
-int BOARD_REV = 4;
-
-U8G2_SSD1315_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
-
-OneButton btnUp(BUTTON_UP, true);
-OneButton btnDown(BUTTON_DOWN, true);
-OneButton btnOK(BUTTON_OK, true);
-OneButton btnAction(BUTTON_ACTION, true);
-
-AT24C256 eep(0x50);
-
-Settings setting;
-PowerManager gPower;
-DFRobot_VL53L0X sensor;
 
 void showLockscreen(bool isWake);
 

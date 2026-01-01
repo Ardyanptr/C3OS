@@ -1,0 +1,122 @@
+# Details
+
+Date : 2025-12-31 10:40:33
+
+Directory c:\\Users\\muted\\Documents\\PlatformIO\\Projects\\C3OS\\src\\
+
+Total : 107 files,  6592 codes, 205 comments, 1683 blanks, all 8480 lines
+
+[Summary](results.md) / Details / [Diff Summary](diff.md) / [Diff Details](diff-details.md)
+
+## Files
+| filename | language | code | comment | blank | total |
+| :--- | :--- | ---: | ---: | ---: | ---: |
+| [C3OS/src/UI/lockscreen.h](/C3OS/src/UI/lockscreen.h) | C++ | 116 | 0 | 21 | 137 |
+| [C3OS/src/app/BLEApp/BLEScanner.cpp](/C3OS/src/app/BLEApp/BLEScanner.cpp) | C++ | 71 | 0 | 21 | 92 |
+| [C3OS/src/app/BLEApp/BLEScanner.h](/C3OS/src/app/BLEApp/BLEScanner.h) | C++ | 12 | 0 | 4 | 16 |
+| [C3OS/src/app/Benchmark/BenchMyESP.cpp](/C3OS/src/app/Benchmark/BenchMyESP.cpp) | C++ | 55 | 3 | 18 | 76 |
+| [C3OS/src/app/Benchmark/BenchMyESP.h](/C3OS/src/app/Benchmark/BenchMyESP.h) | C++ | 13 | 0 | 4 | 17 |
+| [C3OS/src/app/Benchmark/C3Burner.cpp](/C3OS/src/app/Benchmark/C3Burner.cpp) | C++ | 67 | 10 | 19 | 96 |
+| [C3OS/src/app/Benchmark/C3Burner.h](/C3OS/src/app/Benchmark/C3Burner.h) | C++ | 10 | 0 | 4 | 14 |
+| [C3OS/src/app/Essential/Browser.cpp](/C3OS/src/app/Essential/Browser.cpp) | C++ | 197 | 14 | 35 | 246 |
+| [C3OS/src/app/Essential/Browser.h](/C3OS/src/app/Essential/Browser.h) | C++ | 13 | 1 | 5 | 19 |
+| [C3OS/src/app/Essential/FlappyBird.cpp](/C3OS/src/app/Essential/FlappyBird.cpp) | C++ | 80 | 0 | 25 | 105 |
+| [C3OS/src/app/Essential/FlappyBird.h](/C3OS/src/app/Essential/FlappyBird.h) | C++ | 14 | 0 | 5 | 19 |
+| [C3OS/src/app/Essential/HeapMonitor.cpp](/C3OS/src/app/Essential/HeapMonitor.cpp) | C++ | 53 | 0 | 14 | 67 |
+| [C3OS/src/app/Essential/HeapMonitor.h](/C3OS/src/app/Essential/HeapMonitor.h) | C++ | 17 | 0 | 5 | 22 |
+| [C3OS/src/app/Essential/IRBlaster.cpp](/C3OS/src/app/Essential/IRBlaster.cpp) | C++ | 25 | 0 | 8 | 33 |
+| [C3OS/src/app/Essential/IRBlaster.h](/C3OS/src/app/Essential/IRBlaster.h) | C++ | 16 | 0 | 4 | 20 |
+| [C3OS/src/app/Essential/OnlineStory.cpp](/C3OS/src/app/Essential/OnlineStory.cpp) | C++ | 146 | 2 | 31 | 179 |
+| [C3OS/src/app/Essential/OnlineStory.h](/C3OS/src/app/Essential/OnlineStory.h) | C++ | 14 | 0 | 5 | 19 |
+| [C3OS/src/app/Essential/Pong.cpp](/C3OS/src/app/Essential/Pong.cpp) | C++ | 139 | 0 | 29 | 168 |
+| [C3OS/src/app/Essential/Pong.h](/C3OS/src/app/Essential/Pong.h) | C++ | 14 | 0 | 5 | 19 |
+| [C3OS/src/app/Essential/Ruler.cpp](/C3OS/src/app/Essential/Ruler.cpp) | C++ | 67 | 6 | 25 | 98 |
+| [C3OS/src/app/Essential/Ruler.h](/C3OS/src/app/Essential/Ruler.h) | C++ | 13 | 0 | 4 | 17 |
+| [C3OS/src/app/Essential/Settings.cpp](/C3OS/src/app/Essential/Settings.cpp) | C++ | 185 | 14 | 40 | 239 |
+| [C3OS/src/app/Essential/Settings.h](/C3OS/src/app/Essential/Settings.h) | C++ | 50 | 5 | 12 | 67 |
+| [C3OS/src/app/Essential/Stopwatch.cpp](/C3OS/src/app/Essential/Stopwatch.cpp) | C++ | 72 | 2 | 24 | 98 |
+| [C3OS/src/app/Essential/Stopwatch.h](/C3OS/src/app/Essential/Stopwatch.h) | C++ | 12 | 0 | 3 | 15 |
+| [C3OS/src/app/Game/Doom/GameClient\_Doom.cpp](/C3OS/src/app/Game/Doom/GameClient_Doom.cpp) | C++ | 301 | 26 | 53 | 380 |
+| [C3OS/src/app/Game/Doom/GameClient\_Doom.h](/C3OS/src/app/Game/Doom/GameClient_Doom.h) | C++ | 37 | 2 | 11 | 50 |
+| [C3OS/src/app/Game/Minecraft/GameClient.cpp](/C3OS/src/app/Game/Minecraft/GameClient.cpp) | C++ | 140 | 15 | 27 | 182 |
+| [C3OS/src/app/Game/Minecraft/GameClient.h](/C3OS/src/app/Game/Minecraft/GameClient.h) | C++ | 39 | 0 | 11 | 50 |
+| [C3OS/src/app/Game/StardewValleyCopy/GameClient\_svc.cpp](/C3OS/src/app/Game/StardewValleyCopy/GameClient_svc.cpp) | C++ | 90 | 9 | 18 | 117 |
+| [C3OS/src/app/Game/StardewValleyCopy/GameClient\_svc.h](/C3OS/src/app/Game/StardewValleyCopy/GameClient_svc.h) | C++ | 22 | 1 | 7 | 30 |
+| [C3OS/src/app/KeyboardCat/pitches.h](/C3OS/src/app/KeyboardCat/pitches.h) | C++ | 91 | 0 | 1 | 92 |
+| [C3OS/src/app/KeyboardCat/play\_keyboard.cpp](/C3OS/src/app/KeyboardCat/play_keyboard.cpp) | C++ | 41 | 2 | 13 | 56 |
+| [C3OS/src/app/KeyboardCat/play\_keyboardcat.h](/C3OS/src/app/KeyboardCat/play_keyboardcat.h) | C++ | 4 | 0 | 2 | 6 |
+| [C3OS/src/app/WiFiApp/BeaconSpam.cpp](/C3OS/src/app/WiFiApp/BeaconSpam.cpp) | C++ | 23 | 0 | 8 | 31 |
+| [C3OS/src/app/WiFiApp/BeaconSpam.h](/C3OS/src/app/WiFiApp/BeaconSpam.h) | C++ | 15 | 0 | 4 | 19 |
+| [C3OS/src/app/WiFiApp/EchoSniffer.cpp](/C3OS/src/app/WiFiApp/EchoSniffer.cpp) | C++ | 85 | 0 | 28 | 113 |
+| [C3OS/src/app/WiFiApp/EchoSniffer.h](/C3OS/src/app/WiFiApp/EchoSniffer.h) | C++ | 15 | 0 | 4 | 19 |
+| [C3OS/src/app/WiFiApp/WiFiConnect.cpp](/C3OS/src/app/WiFiApp/WiFiConnect.cpp) | C++ | 150 | 13 | 36 | 199 |
+| [C3OS/src/app/WiFiApp/WiFiConnect.h](/C3OS/src/app/WiFiApp/WiFiConnect.h) | C++ | 16 | 0 | 5 | 21 |
+| [C3OS/src/app/WiFiApp/WiFiHostpost.cpp](/C3OS/src/app/WiFiApp/WiFiHostpost.cpp) | C++ | 96 | 0 | 35 | 131 |
+| [C3OS/src/app/WiFiApp/WiFiHotspot.h](/C3OS/src/app/WiFiApp/WiFiHotspot.h) | C++ | 13 | 0 | 5 | 18 |
+| [C3OS/src/app/WiFiApp/WiFiScanner.cpp](/C3OS/src/app/WiFiApp/WiFiScanner.cpp) | C++ | 141 | 7 | 27 | 175 |
+| [C3OS/src/app/WiFiApp/WiFiScanner.h](/C3OS/src/app/WiFiApp/WiFiScanner.h) | C++ | 13 | 0 | 5 | 18 |
+| [C3OS/src/app/WiFiApp/WiFiSniffer.cpp](/C3OS/src/app/WiFiApp/WiFiSniffer.cpp) | C++ | 309 | 40 | 83 | 432 |
+| [C3OS/src/app/WiFiApp/WiFiSniffer.h](/C3OS/src/app/WiFiApp/WiFiSniffer.h) | C++ | 14 | 0 | 5 | 19 |
+| [C3OS/src/app/WiFiApp/WiFiStorm.cpp](/C3OS/src/app/WiFiApp/WiFiStorm.cpp) | C++ | 23 | 0 | 8 | 31 |
+| [C3OS/src/app/WiFiApp/WiFiStorm.h](/C3OS/src/app/WiFiApp/WiFiStorm.h) | C++ | 15 | 0 | 4 | 19 |
+| [C3OS/src/app/WiFiApp/WiFiTelnet.cpp](/C3OS/src/app/WiFiApp/WiFiTelnet.cpp) | C++ | 92 | 0 | 25 | 117 |
+| [C3OS/src/app/WiFiApp/WiFiTelnet.h](/C3OS/src/app/WiFiApp/WiFiTelnet.h) | C++ | 6 | 0 | 2 | 8 |
+| [C3OS/src/app/WiFiApp/WiFiTelnetFunction.h](/C3OS/src/app/WiFiApp/WiFiTelnetFunction.h) | C++ | 67 | 0 | 13 | 80 |
+| [C3OS/src/component/backapp.cpp](/C3OS/src/component/backapp.cpp) | C++ | 139 | 0 | 35 | 174 |
+| [C3OS/src/component/backapp.h](/C3OS/src/component/backapp.h) | C++ | 15 | 0 | 4 | 19 |
+| [C3OS/src/component/button.cpp](/C3OS/src/component/button.cpp) | C++ | 24 | 0 | 4 | 28 |
+| [C3OS/src/component/button.h](/C3OS/src/component/button.h) | C++ | 8 | 0 | 2 | 10 |
+| [C3OS/src/component/draw.cpp](/C3OS/src/component/draw.cpp) | C++ | 33 | 0 | 10 | 43 |
+| [C3OS/src/component/draw.h](/C3OS/src/component/draw.h) | C++ | 5 | 0 | 3 | 8 |
+| [C3OS/src/component/hardware/eeprom.cpp](/C3OS/src/component/hardware/eeprom.cpp) | C++ | 54 | 0 | 14 | 68 |
+| [C3OS/src/component/hardware/eeprom.h](/C3OS/src/component/hardware/eeprom.h) | C++ | 11 | 0 | 3 | 14 |
+| [C3OS/src/component/panic.cpp](/C3OS/src/component/panic.cpp) | C++ | 45 | 0 | 21 | 66 |
+| [C3OS/src/component/panic.h](/C3OS/src/component/panic.h) | C++ | 20 | 0 | 4 | 24 |
+| [C3OS/src/component/queuer.h](/C3OS/src/component/queuer.h) | C++ | 33 | 0 | 9 | 42 |
+| [C3OS/src/component/regis.cpp](/C3OS/src/component/regis.cpp) | C++ | 70 | 0 | 21 | 91 |
+| [C3OS/src/component/regis.h](/C3OS/src/component/regis.h) | C++ | 12 | 0 | 4 | 16 |
+| [C3OS/src/component/service.cpp](/C3OS/src/component/service.cpp) | C++ | 113 | 0 | 26 | 139 |
+| [C3OS/src/component/service.h](/C3OS/src/component/service.h) | C++ | 15 | 0 | 5 | 20 |
+| [C3OS/src/component/supervisor.cpp](/C3OS/src/component/supervisor.cpp) | C++ | 22 | 0 | 6 | 28 |
+| [C3OS/src/component/supervisor.h](/C3OS/src/component/supervisor.h) | C++ | 4 | 0 | 2 | 6 |
+| [C3OS/src/component/ui\_.h](/C3OS/src/component/ui_.h) | C++ | 62 | 6 | 24 | 92 |
+| [C3OS/src/component/vkeyboard.cpp](/C3OS/src/component/vkeyboard.cpp) | C++ | 116 | 0 | 26 | 142 |
+| [C3OS/src/component/vkeyboard.h](/C3OS/src/component/vkeyboard.h) | C++ | 41 | 0 | 9 | 50 |
+| [C3OS/src/component/website.h](/C3OS/src/component/website.h) | C++ | 72 | 0 | 6 | 78 |
+| [C3OS/src/config/config.h](/C3OS/src/config/config.h) | C++ | 27 | 0 | 8 | 35 |
+| [C3OS/src/config/var\_declare.h](/C3OS/src/config/var_declare.h) | C++ | 13 | 0 | 5 | 18 |
+| [C3OS/src/emergency/eme\_restart.h](/C3OS/src/emergency/eme_restart.h) | C++ | 35 | 0 | 12 | 47 |
+| [C3OS/src/emergency/eme\_shutdown.h](/C3OS/src/emergency/eme_shutdown.h) | C++ | 45 | 0 | 17 | 62 |
+| [C3OS/src/icons/bg.h](/C3OS/src/icons/bg.h) | C++ | 3 | 0 | 1 | 4 |
+| [C3OS/src/icons/icon.h](/C3OS/src/icons/icon.h) | C++ | 22 | 0 | 2 | 24 |
+| [C3OS/src/include/BLEAppLib.h](/C3OS/src/include/BLEAppLib.h) | C++ | 2 | 0 | 1 | 3 |
+| [C3OS/src/include/ComponentLib.h](/C3OS/src/include/ComponentLib.h) | C++ | 8 | 0 | 1 | 9 |
+| [C3OS/src/include/CoreLib.h](/C3OS/src/include/CoreLib.h) | C++ | 16 | 0 | 1 | 17 |
+| [C3OS/src/include/EssentialAppLib.h](/C3OS/src/include/EssentialAppLib.h) | C++ | 16 | 0 | 0 | 16 |
+| [C3OS/src/include/SystemCoreLib.h](/C3OS/src/include/SystemCoreLib.h) | C++ | 13 | 0 | 0 | 13 |
+| [C3OS/src/include/UILib.h](/C3OS/src/include/UILib.h) | C++ | 2 | 0 | 1 | 3 |
+| [C3OS/src/include/WiFiAppLib.h](/C3OS/src/include/WiFiAppLib.h) | C++ | 13 | 0 | 2 | 15 |
+| [C3OS/src/main.cpp](/C3OS/src/main.cpp) | C++ | 1,034 | 14 | 323 | 1,371 |
+| [C3OS/src/system16/AT24C256\_EEPROM.h](/C3OS/src/system16/AT24C256_EEPROM.h) | C++ | 44 | 0 | 13 | 57 |
+| [C3OS/src/system16/BIOS.cpp](/C3OS/src/system16/BIOS.cpp) | C++ | 133 | 11 | 21 | 165 |
+| [C3OS/src/system16/BIOS.h](/C3OS/src/system16/BIOS.h) | C++ | 13 | 2 | 3 | 18 |
+| [C3OS/src/system16/app.cpp](/C3OS/src/system16/app.cpp) | C++ | 62 | 0 | 7 | 69 |
+| [C3OS/src/system16/app.h](/C3OS/src/system16/app.h) | C++ | 25 | 0 | 5 | 30 |
+| [C3OS/src/system16/capability.cpp](/C3OS/src/system16/capability.cpp) | C++ | 13 | 0 | 4 | 17 |
+| [C3OS/src/system16/capability.h](/C3OS/src/system16/capability.h) | C++ | 3 | 0 | 1 | 4 |
+| [C3OS/src/system16/esp826.cpp](/C3OS/src/system16/esp826.cpp) | C++ | 116 | 0 | 24 | 140 |
+| [C3OS/src/system16/esp826.h](/C3OS/src/system16/esp826.h) | C++ | 11 | 0 | 5 | 16 |
+| [C3OS/src/system16/memmgmt.h](/C3OS/src/system16/memmgmt.h) | C++ | 88 | 0 | 23 | 111 |
+| [C3OS/src/system16/power.cpp](/C3OS/src/system16/power.cpp) | C++ | 19 | 0 | 6 | 25 |
+| [C3OS/src/system16/power.h](/C3OS/src/system16/power.h) | C++ | 11 | 0 | 3 | 14 |
+| [C3OS/src/system16/power\_manager.cpp](/C3OS/src/system16/power_manager.cpp) | C++ | 128 | 0 | 32 | 160 |
+| [C3OS/src/system16/power\_manager.h](/C3OS/src/system16/power_manager.h) | C++ | 44 | 0 | 19 | 63 |
+| [C3OS/src/system16/restart.h](/C3OS/src/system16/restart.h) | C++ | 44 | 0 | 16 | 60 |
+| [C3OS/src/system16/shutdown.h](/C3OS/src/system16/shutdown.h) | C++ | 50 | 0 | 20 | 70 |
+| [C3OS/src/system16/state.h](/C3OS/src/system16/state.h) | C++ | 8 | 0 | 3 | 11 |
+| [C3OS/src/system16/syscheck.h](/C3OS/src/system16/syscheck.h) | C++ | 208 | 0 | 30 | 238 |
+| [C3OS/src/system16/ui\_manager.cpp](/C3OS/src/system16/ui_manager.cpp) | C++ | 36 | 0 | 16 | 52 |
+| [C3OS/src/system16/ui\_manager.h](/C3OS/src/system16/ui_manager.h) | C++ | 16 | 0 | 4 | 20 |
+| [C3OS/src/system16/wrapper.h](/C3OS/src/system16/wrapper.h) | C++ | 28 | 0 | 6 | 34 |
+
+[Summary](results.md) / Details / [Diff Summary](diff.md) / [Diff Details](diff-details.md)
