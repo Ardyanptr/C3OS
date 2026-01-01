@@ -1,15 +1,11 @@
 #pragma once
 
 #include <Arduino.h>
+#include <LittleFS.h>
 #include <OneButton.h>
-#include <SparkFun_External_EEPROM.h>
 #include <U8g2lib.h>
 
-// Extern dari main agar bisa akses display dan button
-extern U8G2_SSD1315_128X64_NONAME_F_HW_I2C display;
-extern OneButton btnUp;
-extern OneButton btnDown;
-extern OneButton btnOK;
+#include "config/config.h"
 
 extern void drawMenu();
 extern void appHeartBeat();
@@ -20,9 +16,9 @@ class Settings {
         uint32_t signature;
         bool bluetooth;
         bool wifi;
-        uint8_t wifiPower;      // 0-100%
-        uint8_t oledContrast;   // 0-255
-        uint32_t sleepTimeout;  // ms
+        uint8_t wifiPower;
+        uint8_t oledContrast;
+        uint32_t sleepTimeout;
         uint8_t checksum;
     } __attribute__((packed));
 
@@ -35,19 +31,16 @@ class Settings {
     Data& get();
 
    private:
-    ExternalEEPROM myMem;
     Data data;
+    const char* SETTINGS_PATH = "/settings.bin";
 
-    // UI State
     uint8_t cursor = 0;
     bool editing = false;
     bool isRunning = false;
 
-    // Animation variables
     float animCursorY = 0;
     const uint8_t itemHeight = 12;
 
-    // Input Flags
     volatile bool flagUp = false;
     volatile bool flagDown = false;
     volatile bool flagOK = false;
@@ -59,7 +52,6 @@ class Settings {
     void draw();
     void handleInput();
 
-    // Callbacks internal
     static void onUp();
     static void onDown();
     static void onOK();

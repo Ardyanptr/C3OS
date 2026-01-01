@@ -8,11 +8,9 @@ Settings::Settings() {
     instance = this;
 }
 
-// ISR/Callback Gateways
 uint8_t calculateChecksum(const Settings::Data& d) {
     const uint8_t* ptr = (const uint8_t*)&d;
     uint8_t crc = 0;
-    // Hitung semua kecuali byte terakhir (checksum itu sendiri)
     for (size_t i = 0; i < sizeof(Settings::Data) - 1; i++) {
         crc ^= ptr[i];
     }
@@ -28,20 +26,13 @@ void Settings::begin() {
     static bool initialized = false;
 
     if (!initialized) {
-        Wire.begin(8, 9);
-        Wire.setClock(100000);
-
-        if (myMem.begin(0x50)) {
+        if (LittleFS.begin(true)) {
             load();
             apply();
             initialized = true;
-            Serial.println("EEPROM Initialized for the first time.");
-        } else {
-            Serial.println("EEPROM Hardware Not Found!");
         }
     }
 
-    // Bagian bawah ini tetap dijalankan setiap kali menu dibuka
     flagUp = flagDown = flagOK = flagExit = false;
     cursor = 0;
     editing = false;
@@ -53,36 +44,29 @@ void Settings::begin() {
 }
 
 void Settings::load() {
-    Data temp = {0};
     bool success = false;
-
-    // Coba baca maksimal 3 kali jika gagal
-    for (int i = 0; i < 3; i++) {
-        myMem.get(0, temp);
-
-        bool sigValid = (temp.signature == 0x53455431);
-        bool crcValid = (temp.checksum == calculateChecksum(temp));
-
-        if (sigValid && crcValid) {
-            data = temp;
-            if (data.oledContrast < 20) data.oledContrast = 20;
-            Serial.println("EEPROM Load Success!");
-            success = true;
-            break;
+    if (LittleFS.exists(SETTINGS_PATH)) {
+        File file = LittleFS.open(SETTINGS_PATH, "r");
+        if (file) {
+            if (file.read((uint8_t*)&data, sizeof(Data)) == sizeof(Data)) {
+                bool sigValid = (data.signature == 0x53455431);
+                bool crcValid = (data.checksum == calculateChecksum(data));
+                if (sigValid && crcValid) {
+                    success = true;
+                }
+            }
+            file.close();
         }
-        delay(10);  // Kasih jeda sedikit antar percobaan
     }
 
     if (!success) {
-        Serial.println("EEPROM Load Failed after 3 retries! Using defaults in RAM.");
-        // Isi RAM saja, JANGAN panggil save() di sini!
         data.signature = 0x53455431;
         data.bluetooth = false;
         data.wifi = true;
         data.wifiPower = 80;
         data.oledContrast = 150;
         data.sleepTimeout = 60000;
-        // save(); <-- HAPUS BARIS INI, jangan overwrite data asli di chip jika cuma gagal baca
+        data.checksum = calculateChecksum(data);
     }
 }
 
@@ -90,8 +74,11 @@ void Settings::save() {
     data.signature = 0x53455431;
     data.checksum = calculateChecksum(data);
 
-    myMem.put(0, data);
-    Serial.println("Data saved with chksum");
+    File file = LittleFS.open(SETTINGS_PATH, "w");
+    if (file) {
+        file.write((const uint8_t*)&data, sizeof(Data));
+        file.close();
+    }
 }
 
 void Settings::loadSettings() {
@@ -101,9 +88,6 @@ void Settings::loadSettings() {
 
 void Settings::apply() {
     display.setContrast(data.oledContrast);
-
-    // FIX ERROR MAX: Pakai <uint32_t> agar tipe data sinkron
-    // Memastikan sleepTimeout minimal 10 detik (10000ms)
     uint32_t safeTimeout = max<uint32_t>(10000u, data.sleepTimeout);
 
     if (data.wifi) {
@@ -116,21 +100,16 @@ void Settings::apply() {
 
 void Settings::draw() {
     display.clearBuffer();
-
-    // Animasi tetap pakai float
     float targetY = cursor * itemHeight;
     animCursorY += (targetY - animCursorY) * 0.3f;
 
-    // Box seleksi mengikuti animasi
     display.setDrawColor(1);
     display.drawRBox(0, (int)animCursorY + 1, 128, 12, 2);
 
     const char* labels[] = {"Bluetooth", "WiFi Status", "TX Power", "Brightness", "Sleep"};
 
     for (uint8_t i = 0; i < 5; i++) {
-        // PENTING: Gunakan 'cursor' asli untuk warna teks, bukan hasil animasi
         display.setDrawColor(i == cursor ? 0 : 1);
-
         display.setFont(u8g2_font_6x10_tf);
         display.drawStr(5, 11 + (i * itemHeight), labels[i]);
 
@@ -146,7 +125,6 @@ void Settings::draw() {
         else if (i == 4)
             snprintf(buf, sizeof(buf), "%lus", (unsigned long)(data.sleepTimeout / 1000));
 
-        // Tambah visual bracket [] kalau lagi editing agar jelas
         if (editing && i == cursor) {
             char editBuf[25];
             snprintf(editBuf, sizeof(editBuf), "[%s]", buf);
@@ -156,9 +134,6 @@ void Settings::draw() {
         }
     }
 
-    display.setDrawColor(1);
-    display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(0, 63, editing ? "EDITING MODE - PRESS OK TO SAVE" : "HOLD OK TO EXIT | PRESS TO EDIT");
     display.sendBuffer();
 }
 
@@ -184,11 +159,10 @@ void Settings::handleInput() {
         } else {
             if (cursor == 2) data.wifiPower = (data.wifiPower <= 10) ? 0 : data.wifiPower - 10;
             if (cursor == 3) {
-                data.oledContrast = (data.oledContrast <= 20) ? 5 : data.oledContrast - 15;
+                data.oledContrast = (data.oledContrast <= 20) ? 20 : data.oledContrast - 15;
                 display.setContrast(data.oledContrast);
             }
             if (cursor == 4) {
-                // Gunakan casting manual yang lebih bersih
                 uint32_t current = data.sleepTimeout;
                 data.sleepTimeout = (current <= 10000) ? 10000 : current - 10000;
             }
@@ -197,7 +171,7 @@ void Settings::handleInput() {
 
     if (flagOK) {
         flagOK = false;
-        if (cursor < 2) {  // Toggle Bluetooth/Wifi langsung
+        if (cursor < 2) {
             if (cursor == 0) data.bluetooth = !data.bluetooth;
             if (cursor == 1) data.wifi = !data.wifi;
             save();
@@ -213,7 +187,7 @@ void Settings::handleInput() {
 
     if (flagExit) {
         flagExit = false;
-        isRunning = false;  // Memutus loop while di run()
+        isRunning = false;
     }
 }
 
@@ -221,18 +195,13 @@ void Settings::run() {
     isRunning = true;
     while (isRunning) {
         appHeartBeat();
-
-        // Tick button agar tetap responsif di dalam loop
         btnUp.tick();
         btnDown.tick();
         btnOK.tick();
-
         handleInput();
         draw();
-
-        delay(10);  // Sekitar 100 FPS
+        delay(10);
     }
-
     drawMenu();
 }
 

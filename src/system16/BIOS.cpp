@@ -1,6 +1,7 @@
 #include "BIOS.h"
 
 #include <Arduino.h>
+#include <LittleFS.h>
 
 bool upFlag_BIOS = false;
 bool downFlag_BIOS = false;

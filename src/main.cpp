@@ -1,5 +1,6 @@
 #include <Arduino.h>
 
+#include "LittleFS.h"
 #include "config/config.h"
 #include "config/var_declare.h"
 #include "include/BLEAppLib.h"
@@ -560,6 +561,8 @@ void fadeInOLED() {
         display.setContrast(c);
         delay(5);
     }
+
+    setting.loadSettings();
 }
 
 void fadeOutOLED() {
@@ -567,6 +570,8 @@ void fadeOutOLED() {
         display.setContrast(c);
         delay(5);
     }
+
+    setting.loadSettings();
     display.setPowerSave(1);
 }
 
@@ -938,57 +943,75 @@ void log(String msg) {
 
 const char* logBuffer[MAX_LINES];
 int logCount = 0;
-
 float scrollY_Log = 0;
 bool isScrolling_Log = false;
 
+/**
+ * Menambahkan teks ke dalam daftar log (Buffer)
+ */
 void printLog(const char* text) {
     if (logCount < MAX_LINES) {
+        // Jika buffer belum penuh, tambah ke baris berikutnya
         logBuffer[logCount++] = text;
     } else {
-        for (int i = 1; i < MAX_LINES; i++)
+        // Jika penuh, geser semua baris ke atas (Shift Left)
+        for (int i = 1; i < MAX_LINES; i++) {
             logBuffer[i - 1] = logBuffer[i];
-
+        }
+        // Masukkan log baru di baris paling bawah
         logBuffer[MAX_LINES - 1] = text;
     }
 
+    // Picu animasi scroll ke atas
     scrollY_Log += LINE_H;
     isScrolling_Log = true;
 }
 
+/**
+ * Menggambar log ke layar dengan efek animasi scroll
+ */
 void drawLog() {
     display.clearBuffer();
-    display.setFont(u8g2_font_4x6_tr);
+    display.setFont(u8g2_font_6x10_tf);
 
+    // 1. Hitung Animasi (Smooth Scrolling)
     if (isScrolling_Log) {
-        scrollY_Log *= 0.75f;
+        scrollY_Log *= 0.75f;  // Semakin kecil angka, semakin cepat berhentinya
         if (scrollY_Log < 0.5f) {
             scrollY_Log = 0;
             isScrolling_Log = false;
         }
     }
 
-    int visible = SCREEN_H / LINE_H;
-    int start = max(0, logCount - visible);
+    // 2. Tentukan Baris Mana yang Harus Muncul
+    int maxVisible = SCREEN_H / LINE_H;              // Jumlah baris yang muat di layar
+    int startIndex = max(0, logCount - maxVisible);  // Ambil index log terbaru
 
-    for (int i = 0; i < visible; i++) {
-        int idx = start + i;
-        if (idx >= logCount) break;
+    // 3. Render Setiap Baris ke Layar
+    for (int i = 0; i < maxVisible; i++) {
+        int idx = startIndex + i;
+        if (idx >= logCount) break;  // Berhenti jika tidak ada lagi log
 
-        int y = (i * LINE_H) - (int)scrollY_Log + LINE_H;
-        if (y < 0 || y > SCREEN_H) continue;
+        // Hitung posisi Y (Vertikal) tiap baris
+        int yPos = (i * LINE_H) - (int)scrollY_Log + LINE_H;
 
-        display.drawStr(0, y, logBuffer[idx]);
+        // Cek agar tidak menggambar di luar batas layar
+        if (yPos >= 0 && yPos <= SCREEN_H) {
+            display.drawStr(0, yPos, logBuffer[idx]);
+        }
     }
 
     display.sendBuffer();
 }
 
+/**
+ * Delay yang tetap mengupdate tampilan (agar animasi tidak macet)
+ */
 void logDelay(int ms) {
-    unsigned long t = millis();
-    while (millis() - t < ms) {
+    unsigned long startTime = millis();
+    while (millis() - startTime < ms) {
         drawLog();
-        delay(10);
+        delay(10);  // Beri nafas sedikit untuk prosesor
     }
 }
 
@@ -1140,10 +1163,6 @@ void full_boot() {
     }
     logDelay(300);
 
-    printLog("Applying settings");
-    setting.loadSettings();
-    logDelay(100);
-
     printLog("Initialize EEPROM");
     if (error == 0) {
         printLog("Waiting EEPROM...");
@@ -1154,7 +1173,17 @@ void full_boot() {
     }
     logDelay(100);
 
+    printLog("Mounting FS");
+    if (!LittleFS.begin(true))
+        printLog("Failed to mount FS!");
+    else
+        printLog("LittleFS Mounted!");
+
     delay(50);
+
+    printLog("Applying settings");
+    setting.loadSettings();
+    delay(100);
 
     log("Boot phase completed!");
     setupESP8266Communication();
