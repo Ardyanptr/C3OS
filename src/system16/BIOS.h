@@ -6,13 +6,12 @@
 #include "system16/state.h"
 
 extern U8G2_SSD1315_128X64_NONAME_F_HW_I2C display;
-// Tambahkan deklarasi helper jika diperlukan
+
 void runBIOS_SAFE_MODE();
 void runBIOS();
 
 void runLuaScript(const char* path);
 
-// Flags sensor/button
 extern bool upFlag_BIOS;
 extern bool downFlag_BIOS;
 extern bool okFlag_BIOS;

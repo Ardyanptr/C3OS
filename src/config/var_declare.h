@@ -1,28 +1,20 @@
 #pragma once
 #include <Arduino.h>
+#include <DFRobot_VL53L0X.h>
+#include <OneButton.h>
+#include <U8g2lib.h>
+#include <app/Essential/Settings.h>
+#include <system16/AT24C256_EEPROM.h>
+#include <system16/power_manager.h>
 
-#include "config/config.h"
-#include "config/var_declare.h"
-#include "include/BLEAppLib.h"
-#include "include/ComponentLib.h"
-#include "include/CoreLib.h"
-#include "include/EssentialAppLib.h"
-#include "include/SystemCoreLib.h"
-#include "include/UILib.h"
-#include "include/WiFiAppLib.h"
+extern String BOARD_ATTACHED;
+extern int BOARD_REV;
 
-String BOARD_ATTACHED = "ESP32-C3";
-int BOARD_REV = 4;
+extern U8G2_SSD1315_128X64_NONAME_F_HW_I2C display;
 
-U8G2_SSD1315_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
+extern OneButton bntUp, btnDown, btnOK, btnAction;
+extern AT24C256 eep;
 
-OneButton btnUp(BUTTON_UP, true);
-OneButton btnDown(BUTTON_DOWN, true);
-OneButton btnOK(BUTTON_OK, true);
-OneButton btnAction(BUTTON_ACTION, true);
-
-AT24C256 eep(0x50);
-
-Settings setting;
-PowerManager gPower;
-DFRobot_VL53L0X sensor;
+extern Settings setting;
+extern PowerManager gPower;
+extern DFRobot_VL53L0X sensor;

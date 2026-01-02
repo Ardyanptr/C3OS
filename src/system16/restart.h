@@ -18,7 +18,7 @@ extern OneButton btnAction;
 
 extern void drawMenu();
 
-void safe_restart() {
+inline void safe_restart() {
     boot_mode = BOOT_NORMAL;
 
     display.setContrast(0);

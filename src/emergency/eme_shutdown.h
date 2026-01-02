@@ -16,7 +16,7 @@ extern OneButton btnAction;
 
 extern void drawMenu();
 
-void eme_shutdown_run() {
+inline void eme_shutdown_run() {
     boot_mode = BOOT_NORMAL;
 
     stopAllService();

@@ -14,3 +14,4 @@
 #include "app/Game/Minecraft/GameClient.h"
 #include "app/Game/StardewValleyCopy/GameClient_svc.h"
 #include "app/KeyboardCat/play_keyboardcat.h"
+#include "config/gameclient.h"

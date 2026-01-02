@@ -18,7 +18,7 @@ extern OneButton btnAction;
 
 extern void drawMenu();
 
-void safe_shutdown() {
+inline void safe_shutdown() {
     stopAllService();
 
     WiFi.mode(WIFI_OFF);
