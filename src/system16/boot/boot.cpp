@@ -9,6 +9,8 @@ bool eepromAvailable();
 uint8_t readEEPROM(uint16_t addr);
 void writeEEPROM(uint16_t addr, uint8_t val);
 
+extern uint32_t SLEEP_TIMEOUT;
+
 // EEPROM
 void initEEPROM_Failed() {
     const unsigned long RECONNECT_TIMEOUT = 10000;
@@ -544,10 +546,25 @@ void full_boot() {
 
     logDelay(200);
 
-    delay(50);
+    delay(100);
 
     printLog("Applying settings");
     setting.loadSettings();
+    SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+
+    logDelay(100);
+
+    File root = LittleFS.open("/");
+    File f = root.openNextFile();
+    while (f) {
+        Serial.println(f.name());
+        f = root.openNextFile();
+    }
+    root.close();
+
+    runLuaScript("/init.lua");
+    runLuaScript("/motd/rc_local.lua");
+
     delay(100);
 
     log("Boot phase completed!");

@@ -28,6 +28,7 @@ extern void runGameClient_DOOM();
 extern void runBLEScanner();
 extern void runC3Burner();
 extern void runTelnet();
+extern void runFileManager();
 
 extern void non_set();
 
@@ -58,7 +59,8 @@ extern void non_set();
     X(runBLEScanner)           \
     X(runC3Burner)             \
     X(runTelnet)               \
-    X(runGameClient_DOOM)
+    X(runGameClient_DOOM)      \
+    X(runFileManager)
 
 #define X(name) {#name, name, 0, 20 * 1024, true},
 AppDesc appTable[] = {

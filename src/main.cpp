@@ -79,7 +79,7 @@ int currentApp = -1;
 int anrApp = -1;
 
 RTC_DATA_ATTR boot_mode_t boot_mode = BOOT_NORMAL;
-uint32_t SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+uint32_t SLEEP_TIMEOUT;
 
 void showLockscreen(bool isWake);
 void drawMenu();
@@ -153,7 +153,7 @@ const char* menuItems[] = {
     "Keyboard Cat", "WiFi Storm", "Echo Sniffer", "IR Blaster", "Flappy Bird",
     "Factory Reset", "Check System Integrity", "Online Story", "Heap Monitor",
     "Stopwatch", "BenchMyESP", "Minecraft", "Stardew Valley", "BLE Scan", "C3 Burner",
-    "WiFi Telnet", "Doom GL"};
+    "WiFi Telnet", "Doom GL", "File Manager"};
 const int menuCount = sizeof(menuItems) / sizeof(menuItems[0]);
 
 const int visibleItems = 6;

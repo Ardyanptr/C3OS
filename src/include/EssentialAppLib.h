@@ -2,6 +2,7 @@
 #include "app/Benchmark/BenchMyESP.h"
 #include "app/Benchmark/C3Burner.h"
 #include "app/Essential/Browser.h"
+#include "app/Essential/FileManager.h"
 #include "app/Essential/FlappyBird.h"
 #include "app/Essential/HeapMonitor.h"
 #include "app/Essential/IRBlaster.h"

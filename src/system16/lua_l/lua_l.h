@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include "LittleFS.h"
 #include "config/config.h"
