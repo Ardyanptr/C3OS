@@ -1,66 +1,69 @@
 #include "panic.h"
 
-#include <Arduino.h>
+#include <esp_task_wdt.h>
 
-#include "icons/icon.h"
+static bool panicInProgress = false;
+static bool exitPanicSignal = false;
 
-bool isOnPanicKernelLock = true;
-
-static inline uint32_t read_mcause() {
+static inline uint32_t get_mcause() {
     uint32_t v;
     asm volatile("csrr %0, mcause" : "=r"(v));
     return v;
 }
 
-static inline uint32_t read_mtval() {
+static inline uint32_t get_mtval() {
     uint32_t v;
     asm volatile("csrr %0, mtval" : "=r"(v));
     return v;
 }
 
-uint32_t mcause = read_mcause();
-uint32_t mtval = read_mtval();
+void handlePanicExit() {
+    exitPanicSignal = true;
+}
 
 void panic(PanicCode code, const char* msg) {
-    noInterrupts();
+    if (panicInProgress) return;
+    panicInProgress = true;
 
-    display.setFontMode(1);
-    display.setBitmapMode(1);
-    display.drawXBM(0, 0, 57, 9, image_wondrlan_bits);
+    exitPanicSignal = false;
 
-    display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(58, 7, ": KRNL PANIC");
+    uint32_t mcause = get_mcause();
+    uint32_t mtval = get_mtval();
 
-    display.drawXBM(120, 11, 6, 46, image_passport_left_bits);
-    display.drawXBM(3, 10, 7, 7, image_Pin_star_bits);
+    Serial.printf("\n!!! KERNEL PANIC !!!\nCode: %d\nMsg: %s\n", code, msg);
 
+    display.clearBuffer();
     display.setFont(u8g2_font_5x8_tr);
-    display.drawStr(12, 17, "KERNEL PANIC");
+    display.drawFrame(0, 0, 128, 64);
 
-    display.drawFrame(1, 8, 126, 49);
+    display.drawStr(5, 12, "C3OS KERNEL PANIC");
+    display.drawHLine(0, 15, 128);
 
-    char trace_buf[32];
+    char buf[32];
+    snprintf(buf, sizeof(buf), "ERR: %s", msg);
+    display.drawStr(5, 28, buf);
 
-    sprintf(trace_buf, "MCAUSE: 0x%08X", mcause);
-    display.drawStr(3, 27, trace_buf);
+    snprintf(buf, sizeof(buf), "MCAUSE: 0x%08X", mcause);
+    display.drawStr(5, 38, buf);
 
-    sprintf(trace_buf, "MTVAL : 0x%08X", mtval);
-    display.drawStr(3, 34, trace_buf);
+    snprintf(buf, sizeof(buf), "FREE HEAP: %u", ESP.getFreeHeap());
+    display.drawStr(5, 48, buf);
 
-    char stack_trace_buf[32];
-
-    snprintf(stack_trace_buf, sizeof(stack_trace_buf), "STACK TRACE: 0x%08X", ESP.getFreeHeap());
-    display.drawStr(3, 41, stack_trace_buf);
-
-    display.drawStr(1, 63, "Press OK to begin recover!");
+    display.drawStr(5, 60, "Press OK to Recovery");
     display.sendBuffer();
 
-    btnOK.attachClick([]() { isOnPanicKernelLock = false; delay(100); C3OSRecovery(); });
+    btnOK.attachClick([]() { exitPanicSignal = true; });
 
-    while (isOnPanicKernelLock) {
+    while (!exitPanicSignal) {
+        esp_task_wdt_reset();
+
         btnOK.tick();
 
-        delay(2);
-        yield();
+        delay(10);
     }
+
+    Serial.println("Rebooting for recovery...");
+    delay(500);
+    C3OSRecovery();
+    ESP.restart();
 }

@@ -11,6 +11,7 @@
 #include "app/Essential/Ruler.h"
 #include "app/Essential/Settings.h"
 #include "app/Essential/Stopwatch.h"
+#include "app/Essential/StoreManager.h"
 #include "app/Game/Doom/GameClient_Doom.h"
 #include "app/Game/Minecraft/GameClient.h"
 #include "app/Game/StardewValleyCopy/GameClient_svc.h"

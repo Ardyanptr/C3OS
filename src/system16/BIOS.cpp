@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <LittleFS.h>
+#include <system16/boot/boot.h>
 
 bool upFlag_BIOS = false;
 bool downFlag_BIOS = false;
@@ -97,9 +98,6 @@ void runBIOS() {
         } else {
             display.drawStr(89, 32, "READY");
         }
-
-        display.drawLine(0, 56, 128, 56);
-        display.drawStr(2, 62, "NAV: UP/DN | SET: OK | EXIT: ACT");
         display.sendBuffer();
     };
 
@@ -152,5 +150,5 @@ void runBIOS() {
     btnOK.attachClick(nullptr);
     btnAction.attachClick(nullptr);
 
-    drawMenu();
+    boot();
 }

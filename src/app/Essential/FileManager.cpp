@@ -22,6 +22,8 @@ static std::vector<FileItem> items;
 const int ITEM_H = 12;
 const int MAX_VISIBLE_ITEMS = 4;
 
+static char pendingLua[128] = {0};
+
 static void updateScroll() {
     if (cursor >= scrollOffset + MAX_VISIBLE_ITEMS) {
         scrollOffset = cursor - MAX_VISIBLE_ITEMS + 1;
@@ -98,11 +100,10 @@ static void onOK() {
     }
 
     char fullPath[128];
-    if (currentPath[strlen(currentPath) - 1] == '/') {
+    if (currentPath[strlen(currentPath) - 1] == '/')
         snprintf(fullPath, sizeof(fullPath), "%s%s", currentPath, selected.name);
-    } else {
+    else
         snprintf(fullPath, sizeof(fullPath), "%s/%s", currentPath, selected.name);
-    }
 
     if (selected.isDir) {
         strncpy(currentPath, fullPath, sizeof(currentPath) - 1);
@@ -112,8 +113,8 @@ static void onOK() {
     } else {
         size_t len = strlen(selected.name);
         if (len > 4 && strcmp(selected.name + len - 4, ".lua") == 0) {
+            strcpy(pendingLua, fullPath);
             exitManager = true;
-            runLuaScript(fullPath);
         }
     }
 }
@@ -176,6 +177,8 @@ void runFileManager() {
     exitManager = false;
     cursor = 0;
     scrollOffset = 0;
+    pendingLua[0] = 0;
+
     scanDirectory();
 
     btnUp.attachClick(onUp);
@@ -192,4 +195,14 @@ void runFileManager() {
     }
 
     drawMenu();
+
+    if (pendingLua[0]) {
+        runLuaScript(pendingLua);
+        pendingLua[0] = 0;
+
+        btnUp.attachClick(onUp);
+        btnDown.attachClick(onDown);
+        btnOK.attachClick(onOK);
+        btnOK.attachLongPressStart(onExit);
+    }
 }

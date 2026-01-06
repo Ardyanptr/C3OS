@@ -419,10 +419,20 @@ void full_boot() {
         registerService("Button Reset Emergency", BA_EME_RESTART_COMBINATION, 1024);
         registerService("BATTERY", BA_BATTERY, 2048);
 
+        if (!LittleFS.begin(true)) {
+            panic(PANIC_LFS_MOUNT_FAILED, "Failed to mount FS!");
+        } else {
+            log("LittleFS Mounted!");
+        }
+
+        setting.loadSettings();
+        SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+
+        startService();
+
         smoothProgress(0.5, 1.0, 100);
 
         showLockscreen(true);
-        drawMenu();
         return;
     }
 
@@ -433,6 +443,11 @@ void full_boot() {
 
     if (cause == ESP_RST_BROWNOUT) {
         batteryDead();
+        return;
+    }
+
+    if (cause == ESP_RST_INT_WDT) {
+        panic(PANIC_IPC_DROP, "Watchdog Held Too Long");
         return;
     }
 
@@ -453,9 +468,6 @@ void full_boot() {
 
     ledcSetup(0, 5000, 6);
     ledcAttachPin(6, 1);
-
-    uint32_t tmp;
-    if (loadSleep(tmp)) SLEEP_TIMEOUT = tmp;
 
     log("[mdloader/info]: VL53 test");
     sensor.begin(0x29);
@@ -552,6 +564,9 @@ void full_boot() {
     setting.loadSettings();
     SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
 
+    uint32_t tmp;
+    if (loadSleep(tmp)) SLEEP_TIMEOUT = tmp;
+
     logDelay(100);
 
     File root = LittleFS.open("/");
@@ -641,6 +656,12 @@ void safe_boot() {
     sendCommand("32:start");
     display.drawStr(1, 63, "Loaded ESP8266-COM");
     display.sendBuffer();
+
+    delay(100);
+
+    if (LittleFS.begin(true)) {
+        SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+    }
 
     startService();
     drawMenu();
