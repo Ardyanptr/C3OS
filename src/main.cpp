@@ -421,7 +421,7 @@ void loop() {
 
     if (pendingLockscreen) {
         pendingLockscreen = false;
-        showLockscreen(true);
+        startAOD();
     }
 
     if (isScrolling) drawMenu();
