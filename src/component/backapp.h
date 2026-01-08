@@ -17,3 +17,4 @@ void BA_LED(void* param);
 void BA_HEAP_ALLOCATOR(void* param);
 void BA_EME_RESTART_COMBINATION(void* param);
 void BA_BATTERY(void* param);
+void BA_TIMERTICK(void* param);

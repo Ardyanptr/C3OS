@@ -489,6 +489,7 @@ void full_boot() {
     registerService("Heap Allocator", BA_HEAP_ALLOCATOR, 1024);
     registerService("Button Reset Emergency", BA_EME_RESTART_COMBINATION, 1024);
     registerService("BATTERY", BA_BATTERY, 2048);
+    registerService("TimerTicker", BA_TIMERTICK, 2048);
     smoothProgress(0.8, 0.9, 900);
 
     log("Finalizing boot");

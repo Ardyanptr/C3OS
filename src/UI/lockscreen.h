@@ -1,8 +1,88 @@
 #pragma once
+#include "app/Essential/Timer.h"
 #include "config/config.h"
+#include "config/var_declare.h"
+#include "driver/rtc_io.h"
+#include "esp_sleep.h"
 
 extern void appHeartBeat();
 extern bool systemUIActive;
+
+inline void displayAOD() {
+    display.clearBuffer();
+
+    if (timerIsRunning()) {
+        uint32_t t = timerGetRemain();
+        uint8_t m = t / 60;
+        uint8_t s = t % 60;
+
+        char buf[6];
+        sprintf(buf, "%02d:%02d", m, s);
+
+        display.setFont(u8g2_font_7x14_tf);
+        display.drawStr(34, 36, buf);
+    } else {
+        display.drawStr(28, 36, "AOD");
+    }
+
+    display.sendBuffer();
+}
+
+inline void startAOD() {
+    uint8_t pin = Settings::instance->get().aodPin;
+    gpio_num_t wakePin = (gpio_num_t)pin;
+
+    display.setContrast(1);
+    displayAOD();
+
+    pinMode(pin, INPUT_PULLUP);
+
+    gpio_wakeup_enable(wakePin, GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+
+    uint32_t lastTick = millis();
+    uint32_t lastRemain = 0xFFFFFFFF;
+
+    delay(200);
+
+    while (true) {
+        uint32_t now = millis();
+
+        if (now - lastTick >= 1000) {
+            timerTick();
+            lastTick = now;
+        }
+
+        uint32_t remain = timerGetRemain();
+        if (remain != lastRemain) {
+            displayAOD();
+            lastRemain = remain;
+        }
+
+        esp_sleep_enable_timer_wakeup(1000000);
+
+        esp_light_sleep_start();
+
+        esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+
+        if (cause == ESP_SLEEP_WAKEUP_GPIO || digitalRead(pin) == LOW) {
+            break;
+        }
+    }
+
+    gpio_wakeup_disable(wakePin);
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+
+    unsigned long releaseStart = millis();
+    while (digitalRead(pin) == LOW) {
+        appHeartBeat();
+        if (millis() - releaseStart > 2000) break;
+        delay(10);
+    }
+
+    delay(150);
+    display.setContrast(Settings::instance->get().oledContrast);
+}
 
 inline void showLockscreen(bool isWake) {
     systemUIActive = true;
@@ -46,6 +126,7 @@ inline void showLockscreen(bool isWake) {
 
     while (true) {
         appHeartBeat();
+        timerTick();
 
         unsigned long now = millis();
         if (now - lastAnim > 120) {
@@ -53,9 +134,18 @@ inline void showLockscreen(bool isWake) {
             lastAnim = now;
         }
 
-        if (isWake && (now - lockStart > LOCK_TIMEOUT)) {
-            enterSleep();
-            return;
+        if (now - lockStart > LOCK_TIMEOUT) {
+            startAOD();
+
+            now = millis();
+            lockStart = now;
+            idx = 0;
+            curVal = 0;
+
+            display.setContrast(Settings::instance->get().oledContrast);
+            draw(false);
+
+            upWasLow = downWasLow = okWasLow = actWasLow = true;
         }
 
         int upL = digitalRead(BUTTON_UP);
@@ -99,11 +189,6 @@ inline void showLockscreen(bool isWake) {
                 for (uint8_t i = 0; i < CODE_LEN; ++i)
                     if (input[i] != secret[i]) ok = false;
                 if (ok) {
-                    digitalWrite(upL, HIGH);
-                    digitalWrite(dnL, HIGH);
-                    digitalWrite(okL, HIGH);
-                    digitalWrite(acL, HIGH);
-                    delay(100);
                     break;
                 } else {
                     idx = 0;

@@ -1,0 +1,176 @@
+Date : 2026-01-06 23:23:00
+Directory : c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\
+Total : 127 files,  7651 codes, 187 comments, 1977 blanks, all 9815 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| C++      |        127 |      7,651 |        187 |      1,977 |      9,815 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                   |        127 |      7,651 |        187 |      1,977 |      9,815 |
+| . (Files)                                                                                           |          1 |        353 |          0 |        116 |        469 |
+| UI                                                                                                  |          6 |        313 |          0 |         81 |        394 |
+| app                                                                                                 |         54 |      3,770 |        162 |        944 |      4,876 |
+| app\BLEApp                                                                                          |          2 |         83 |          0 |         25 |        108 |
+| app\Benchmark                                                                                       |          4 |        135 |         14 |         44 |        193 |
+| app\Essential                                                                                       |         22 |      1,694 |         33 |        435 |      2,162 |
+| app\Game                                                                                            |          6 |        629 |         53 |        127 |        809 |
+| app\Game\Doom                                                                                       |          2 |        338 |         28 |         64 |        430 |
+| app\Game\Minecraft                                                                                  |          2 |        179 |         15 |         38 |        232 |
+| app\Game\StardewValleyCopy                                                                          |          2 |        112 |         10 |         25 |        147 |
+| app\KeyboardCat                                                                                     |          3 |        136 |          2 |         16 |        154 |
+| app\WiFiApp                                                                                         |         17 |      1,093 |         60 |        297 |      1,450 |
+| component                                                                                           |         21 |        920 |          6 |        237 |      1,163 |
+| component (Files)                                                                                   |         19 |        855 |          6 |        220 |      1,081 |
+| component\hardware                                                                                  |          2 |         65 |          0 |         17 |         82 |
+| config                                                                                              |          3 |         46 |          0 |         13 |         59 |
+| emergency                                                                                           |          2 |         80 |          0 |         29 |        109 |
+| icons                                                                                               |          2 |         26 |          0 |          3 |         29 |
+| include                                                                                             |          8 |         90 |          0 |         10 |        100 |
+| system16                                                                                            |         30 |      2,053 |         19 |        544 |      2,616 |
+| system16 (Files)                                                                                    |         21 |      1,105 |          0 |        263 |      1,368 |
+| system16\C3FS                                                                                       |          2 |         52 |          0 |         18 |         70 |
+| system16\boot                                                                                       |          2 |        523 |          7 |        158 |        688 |
+| system16\handler                                                                                    |          1 |         65 |          0 |         19 |         84 |
+| system16\lua_l                                                                                      |          4 |        308 |         12 |         86 |        406 |
++-----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                                            | language | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\UI\battery_dead.h                             | C++      |         35 |          0 |         12 |         47 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\UI\crash_handler.h                            | C++      |         48 |          0 |         18 |         66 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\UI\floater.h                                  | C++      |         11 |          0 |          3 |         14 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\UI\lockscreen.h                               | C++      |        116 |          0 |         21 |        137 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\UI\recovery.h                                 | C++      |         78 |          0 |         21 |         99 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\UI\smoothprogress.h                           | C++      |         25 |          0 |          6 |         31 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\BLEApp\BLEScanner.cpp                     | C++      |         71 |          0 |         21 |         92 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\BLEApp\BLEScanner.h                       | C++      |         12 |          0 |          4 |         16 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Benchmark\BenchMyESP.cpp                  | C++      |         55 |          3 |         18 |         76 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Benchmark\BenchMyESP.h                    | C++      |         13 |          0 |          4 |         17 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Benchmark\C3Burner.cpp                    | C++      |         57 |         11 |         18 |         86 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Benchmark\C3Burner.h                      | C++      |         10 |          0 |          4 |         14 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Browser.cpp                     | C++      |        197 |         14 |         35 |        246 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Browser.h                       | C++      |         13 |          1 |          5 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\FileManager.cpp                 | C++      |        171 |          0 |         37 |        208 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\FileManager.h                   | C++      |          8 |          0 |          3 |         11 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\FlappyBird.cpp                  | C++      |         80 |          0 |         25 |        105 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\FlappyBird.h                    | C++      |         14 |          0 |          5 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\HeapMonitor.cpp                 | C++      |         53 |          0 |         14 |         67 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\HeapMonitor.h                   | C++      |         17 |          0 |          5 |         22 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\IRBlaster.cpp                   | C++      |         25 |          0 |          8 |         33 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\IRBlaster.h                     | C++      |         16 |          0 |          4 |         20 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\OnlineStory.cpp                 | C++      |        146 |          2 |         31 |        179 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\OnlineStory.h                   | C++      |         14 |          0 |          5 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Pong.cpp                        | C++      |        139 |          0 |         29 |        168 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Pong.h                          | C++      |         14 |          0 |          5 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Ruler.cpp                       | C++      |         67 |          6 |         25 |         98 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Ruler.h                         | C++      |         13 |          0 |          4 |         17 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Settings.cpp                    | C++      |        179 |          0 |         29 |        208 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Settings.h                      | C++      |         47 |          0 |         12 |         59 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Stopwatch.cpp                   | C++      |         72 |          2 |         24 |         98 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\Stopwatch.h                     | C++      |         12 |          0 |          3 |         15 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\StoreManager.cpp                | C++      |        383 |          8 |        122 |        513 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Essential\StoreManager.h                  | C++      |         14 |          0 |          5 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Game\Doom\GameClient_Doom.cpp             | C++      |        301 |         26 |         53 |        380 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Game\Doom\GameClient_Doom.h               | C++      |         37 |          2 |         11 |         50 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Game\Minecraft\GameClient.cpp             | C++      |        140 |         15 |         27 |        182 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Game\Minecraft\GameClient.h               | C++      |         39 |          0 |         11 |         50 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Game\StardewValleyCopy\GameClient_svc.cpp | C++      |         90 |          9 |         18 |        117 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\Game\StardewValleyCopy\GameClient_svc.h   | C++      |         22 |          1 |          7 |         30 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\KeyboardCat\pitches.h                     | C++      |         91 |          0 |          1 |         92 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\KeyboardCat\play_keyboard.cpp             | C++      |         41 |          2 |         13 |         56 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\KeyboardCat\play_keyboardcat.h            | C++      |          4 |          0 |          2 |          6 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\BeaconSpam.cpp                    | C++      |         23 |          0 |          8 |         31 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\BeaconSpam.h                      | C++      |         15 |          0 |          4 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\EchoSniffer.cpp                   | C++      |         85 |          0 |         28 |        113 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\EchoSniffer.h                     | C++      |         15 |          0 |          4 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiConnect.cpp                   | C++      |        150 |         13 |         36 |        199 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiConnect.h                     | C++      |         16 |          0 |          5 |         21 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiHostpost.cpp                  | C++      |         96 |          0 |         35 |        131 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiHotspot.h                     | C++      |         13 |          0 |          5 |         18 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiScanner.cpp                   | C++      |        141 |          7 |         27 |        175 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiScanner.h                     | C++      |         13 |          0 |          5 |         18 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiSniffer.cpp                   | C++      |        309 |         40 |         83 |        432 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiSniffer.h                     | C++      |         14 |          0 |          5 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiStorm.cpp                     | C++      |         23 |          0 |          8 |         31 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiStorm.h                       | C++      |         15 |          0 |          4 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiTelnet.cpp                    | C++      |         92 |          0 |         25 |        117 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiTelnet.h                      | C++      |          6 |          0 |          2 |          8 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\app\WiFiApp\WiFiTelnetFunction.h              | C++      |         67 |          0 |         13 |         80 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\backapp.cpp                         | C++      |        139 |          0 |         35 |        174 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\backapp.h                           | C++      |         15 |          0 |          4 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\button.cpp                          | C++      |         24 |          0 |          4 |         28 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\button.h                            | C++      |          8 |          0 |          2 |         10 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\draw.cpp                            | C++      |         33 |          0 |         10 |         43 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\draw.h                              | C++      |          5 |          0 |          3 |          8 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\hardware\eeprom.cpp                 | C++      |         54 |          0 |         14 |         68 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\hardware\eeprom.h                   | C++      |         11 |          0 |          3 |         14 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\panic.cpp                           | C++      |         49 |          0 |         20 |         69 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\panic.h                             | C++      |         22 |          0 |          4 |         26 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\queuer.h                            | C++      |         33 |          0 |          9 |         42 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\regis.cpp                           | C++      |         70 |          0 |         21 |         91 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\regis.h                             | C++      |         12 |          0 |          4 |         16 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\service.cpp                         | C++      |        113 |          0 |         26 |        139 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\service.h                           | C++      |         15 |          0 |          5 |         20 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\supervisor.cpp                      | C++      |         22 |          0 |          6 |         28 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\supervisor.h                        | C++      |          4 |          0 |          2 |          6 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\ui_.h                               | C++      |         62 |          6 |         24 |         92 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\vkeyboard.cpp                       | C++      |        116 |          0 |         26 |        142 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\vkeyboard.h                         | C++      |         41 |          0 |          9 |         50 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\component\website.h                           | C++      |         72 |          0 |          6 |         78 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\config\config.h                               | C++      |         27 |          0 |          8 |         35 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\config\gameclient.h                           | C++      |          3 |          0 |          1 |          4 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\config\var_declare.h                          | C++      |         16 |          0 |          4 |         20 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\emergency\eme_restart.h                       | C++      |         35 |          0 |         12 |         47 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\emergency\eme_shutdown.h                      | C++      |         45 |          0 |         17 |         62 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\icons\bg.h                                    | C++      |          3 |          0 |          1 |          4 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\icons\icon.h                                  | C++      |         23 |          0 |          2 |         25 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\include\BLEAppLib.h                           | C++      |          2 |          0 |          1 |          3 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\include\ComponentLib.h                        | C++      |          8 |          0 |          1 |          9 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\include\CoreLib.h                             | C++      |         17 |          0 |          1 |         18 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\include\EssentialAppLib.h                     | C++      |         19 |          0 |          1 |         20 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\include\SystemCoreLib.h                       | C++      |         13 |          0 |          0 |         13 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\include\UILib.h                               | C++      |          7 |          0 |          2 |          9 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\include\WiFiAppLib.h                          | C++      |         13 |          0 |          2 |         15 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\include\all_.h                                | C++      |         11 |          0 |          2 |         13 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\main.cpp                                      | C++      |        353 |          0 |        116 |        469 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\AT24C256_EEPROM.h                    | C++      |         44 |          0 |         13 |         57 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\BIOS.cpp                             | C++      |        133 |          0 |         21 |        154 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\BIOS.h                               | C++      |         14 |          0 |          5 |         19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\C3FS\C3FS.cpp                        | C++      |         39 |          0 |         14 |         53 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\C3FS\C3FS.h                          | C++      |         13 |          0 |          4 |         17 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\app.cpp                              | C++      |         66 |          0 |          7 |         73 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\app.h                                | C++      |         25 |          0 |          5 |         30 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\boot\boot.cpp                        | C++      |        516 |          7 |        154 |        677 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\boot\boot.h                          | C++      |          7 |          0 |          4 |         11 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\capability.cpp                       | C++      |         13 |          0 |          4 |         17 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\capability.h                         | C++      |          3 |          0 |          1 |          4 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\esp826.cpp                           | C++      |        116 |          0 |         24 |        140 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\esp826.h                             | C++      |         11 |          0 |          5 |         16 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\handler\anr_handler.h                | C++      |         65 |          0 |         19 |         84 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\lua_l\button_state.cpp               | C++      |          5 |          0 |          1 |          6 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\lua_l\button_state.h                 | C++      |         17 |          0 |          3 |         20 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\lua_l\lua_l.cpp                      | C++      |        279 |         12 |         80 |        371 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\lua_l\lua_l.h                        | C++      |          7 |          0 |          2 |          9 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\memmgmt.h                            | C++      |         88 |          0 |         23 |        111 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\power.cpp                            | C++      |         19 |          0 |          6 |         25 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\power.h                              | C++      |         11 |          0 |          3 |         14 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\power_manager.cpp                    | C++      |        128 |          0 |         32 |        160 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\power_manager.h                      | C++      |         44 |          0 |         19 |         63 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\restart.h                            | C++      |         44 |          0 |         16 |         60 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\shutdown.h                           | C++      |         50 |          0 |         20 |         70 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\state.h                              | C++      |          8 |          0 |          3 |         11 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\syscheck.h                           | C++      |        208 |          0 |         30 |        238 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\ui_manager.cpp                       | C++      |         36 |          0 |         16 |         52 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\ui_manager.h                         | C++      |         16 |          0 |          4 |         20 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\system16\wrapper.h                            | C++      |         28 |          0 |          6 |         34 |
+| Total                                                                                               |          |      7,651 |        187 |      1,977 |      9,815 |
++-----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+

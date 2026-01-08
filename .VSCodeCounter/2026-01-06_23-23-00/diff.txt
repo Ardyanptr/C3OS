@@ -1,0 +1,64 @@
+Date : 2026-01-06 23:23:00
+Directory : c:\Users\muted\Documents\PlatformIO\Projects\C3OS\src\
+Total : 19 files,  -2213 codes, -75 comments, -181 blanks, all -2469 lines
+
+Languages
++------------+------------+------------+------------+------------+------------+
+| language   | files      | code       | comment    | blank      | total      |
++------------+------------+------------+------------+------------+------------+
+| JSON       |          1 |         -1 |          0 |          0 |         -1 |
+| Properties |          1 |         -9 |          0 |         -1 |        -10 |
+| Python     |          2 |        -13 |         -3 |         -4 |        -20 |
+| OC Lua     |          3 |        -37 |         -1 |        -12 |        -50 |
+| Ini        |          1 |        -53 |         -9 |         -3 |        -65 |
+| Markdown   |          6 |       -359 |          0 |        -57 |       -416 |
+| C++        |          4 |       -710 |        -62 |       -104 |       -876 |
+| Log        |          1 |     -1,031 |          0 |          0 |     -1,031 |
++------------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                                  | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                                     |         19 |     -2,213 |        -75 |       -181 |     -2,469 |
+| ..                                                                                                                    |         19 |     -2,213 |        -75 |       -181 |     -2,469 |
+| .. (Files)                                                                                                            |          5 |     -1,099 |        -12 |         -8 |     -1,119 |
+| ..\.VSCodeCounter                                                                                                     |          5 |       -172 |          0 |        -26 |       -198 |
+| ..\.VSCodeCounter\2025-12-31_10-40-33                                                                                 |          5 |       -172 |          0 |        -26 |       -198 |
+| ..\data                                                                                                               |          3 |        -37 |         -1 |        -12 |        -50 |
+| ..\data (Files)                                                                                                       |          1 |        -28 |         -1 |         -9 |        -38 |
+| ..\data\cfg                                                                                                           |          1 |         -9 |          0 |         -2 |        -11 |
+| ..\data\motd                                                                                                          |          1 |          0 |          0 |         -1 |         -1 |
+| ..\lib                                                                                                                |          6 |       -905 |        -62 |       -135 |     -1,102 |
+| ..\lib\ESP32C3-BLE-Keyboard                                                                                           |          6 |       -905 |        -62 |       -135 |     -1,102 |
+| ..\lib\ESP32C3-BLE-Keyboard (Files)                                                                                   |          4 |       -814 |        -24 |       -118 |       -956 |
+| ..\lib\ESP32C3-BLE-Keyboard\examples                                                                                  |          2 |        -91 |        -38 |        -17 |       -146 |
+| ..\lib\ESP32C3-BLE-Keyboard\examples\SendKeyStrokes                                                                   |          1 |        -22 |        -14 |        -11 |        -47 |
+| ..\lib\ESP32C3-BLE-Keyboard\examples\SendMediaKey                                                                     |          1 |        -69 |        -24 |         -6 |        -99 |
++-----------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| filename                                                                                                              | language   | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\.VSCodeCounter\2025-12-31_10-40-33\details.md                       | Markdown   |       -116 |          0 |         -6 |       -122 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\.VSCodeCounter\2025-12-31_10-40-33\diff-details.md                  | Markdown   |         -9 |          0 |         -6 |        -15 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\.VSCodeCounter\2025-12-31_10-40-33\diff.md                          | Markdown   |        -12 |          0 |         -7 |        -19 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\.VSCodeCounter\2025-12-31_10-40-33\results.json                     | JSON       |         -1 |          0 |          0 |         -1 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\.VSCodeCounter\2025-12-31_10-40-33\results.md                       | Markdown   |        -34 |          0 |         -7 |        -41 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\README.md                                                           | Markdown   |         -2 |          0 |         -1 |         -3 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\build.log                                                           | Log        |     -1,031 |          0 |          0 |     -1,031 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\ccache.py                                                           | Python     |         -7 |         -3 |         -4 |        -14 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\data\cfg\user_prefs.lua                                             | OC Lua     |         -9 |          0 |         -2 |        -11 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\data\init.lua                                                       | OC Lua     |        -28 |         -1 |         -9 |        -38 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\data\motd\rc_local.lua                                              | OC Lua     |          0 |          0 |         -1 |         -1 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\extra_script.py                                                     | Python     |         -6 |          0 |          0 |         -6 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\lib\ESP32C3-BLE-Keyboard\BleKeyboard.cpp                            | C++        |       -460 |        -22 |        -64 |       -546 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\lib\ESP32C3-BLE-Keyboard\BleKeyboard.h                              | C++        |       -159 |         -2 |        -23 |       -184 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\lib\ESP32C3-BLE-Keyboard\README.md                                  | Markdown   |       -186 |          0 |        -30 |       -216 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\lib\ESP32C3-BLE-Keyboard\examples\SendKeyStrokes\SendKeyStrokes.ino | C++        |        -22 |        -14 |        -11 |        -47 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\lib\ESP32C3-BLE-Keyboard\examples\SendMediaKey\SendMediaKey.ino     | C++        |        -69 |        -24 |         -6 |        -99 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\lib\ESP32C3-BLE-Keyboard\library.properties                         | Properties |         -9 |          0 |         -1 |        -10 |
+| c:\Users\muted\Documents\PlatformIO\Projects\C3OS\platformio.ini                                                      | Ini        |        -53 |         -9 |         -3 |        -65 |
+| Total                                                                                                                 |            |     -2,213 |        -75 |       -181 |     -2,469 |
++-----------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+

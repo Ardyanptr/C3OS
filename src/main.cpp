@@ -153,7 +153,7 @@ const char* menuItems[] = {
     "Keyboard Cat", "WiFi Storm", "Echo Sniffer", "IR Blaster", "Flappy Bird",
     "Factory Reset", "Check System Integrity", "Online Story", "Heap Monitor",
     "Stopwatch", "BenchMyESP", "Minecraft", "Stardew Valley", "BLE Scan", "C3 Burner",
-    "WiFi Telnet", "Doom GL", "File Manager", "Store Manager"};
+    "WiFi Telnet", "Doom GL", "File Manager", "Store Manager", "Timer"};
 const int menuCount = sizeof(menuItems) / sizeof(menuItems[0]);
 
 const int visibleItems = 6;
@@ -414,6 +414,8 @@ void loop() {
     btnDown.tick();
     btnOK.tick();
     btnAction.tick();
+
+    timerTick();
 
     gPower.loop();
 

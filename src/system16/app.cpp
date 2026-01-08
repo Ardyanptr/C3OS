@@ -30,6 +30,7 @@ extern void runC3Burner();
 extern void runTelnet();
 extern void runFileManager();
 extern void runStore();
+extern void runTimerApp();
 
 extern void non_set();
 
@@ -62,7 +63,8 @@ extern void non_set();
     X(runTelnet)               \
     X(runGameClient_DOOM)      \
     X(runFileManager)          \
-    X(runStore)
+    X(runStore)                \
+    X(runTimerApp)
 
 #define X(name) {#name, name, 0, 20 * 1024, true},
 AppDesc appTable[] = {

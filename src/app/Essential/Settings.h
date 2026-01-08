@@ -19,6 +19,7 @@ class Settings {
         uint8_t wifiPower;
         uint8_t oledContrast;
         uint32_t sleepTimeout;
+        uint32_t aodPin;
         uint8_t checksum;
     } __attribute__((packed));
 

@@ -66,6 +66,7 @@ void Settings::load() {
         data.wifiPower = 80;
         data.oledContrast = 150;
         data.sleepTimeout = 60000;
+        data.aodPin = 4;
         data.checksum = calculateChecksum(data);
     }
 }
@@ -106,9 +107,9 @@ void Settings::draw() {
     display.setDrawColor(1);
     display.drawRBox(0, (int)animCursorY + 1, 128, 12, 2);
 
-    const char* labels[] = {"Bluetooth", "WiFi Status", "TX Power", "Brightness", "Sleep"};
+    const char* labels[] = {"Bluetooth", "WiFi Status", "TX Power", "Brightness", "Sleep", "AOD Wake"};
 
-    for (uint8_t i = 0; i < 5; i++) {
+    for (uint8_t i = 0; i < 6; i++) {
         display.setDrawColor(i == cursor ? 0 : 1);
         display.setFont(u8g2_font_6x10_tf);
         display.drawStr(5, 11 + (i * itemHeight), labels[i]);
@@ -124,6 +125,8 @@ void Settings::draw() {
             snprintf(buf, sizeof(buf), "%d", data.oledContrast);
         else if (i == 4)
             snprintf(buf, sizeof(buf), "%lus", (unsigned long)(data.sleepTimeout / 1000));
+        else if (i == 5)
+            snprintf(buf, sizeof(buf), "GPIO %d", data.aodPin);
 
         if (editing && i == cursor) {
             char editBuf[25];
@@ -141,7 +144,7 @@ void Settings::handleInput() {
     if (flagUp) {
         flagUp = false;
         if (!editing) {
-            cursor = (cursor == 0) ? 4 : cursor - 1;
+            cursor = (cursor == 0) ? 5 : cursor - 1;
         } else {
             if (cursor == 2) data.wifiPower = (data.wifiPower >= 100) ? 100 : data.wifiPower + 10;
             if (cursor == 3) {
@@ -149,13 +152,14 @@ void Settings::handleInput() {
                 display.setContrast(data.oledContrast);
             }
             if (cursor == 4) data.sleepTimeout += 10000;
+            if (cursor == 5) data.aodPin = (data.aodPin >= 4) ? 0 : data.aodPin + 1;
         }
     }
 
     if (flagDown) {
         flagDown = false;
         if (!editing) {
-            cursor = (cursor == 4) ? 0 : cursor + 1;
+            cursor = (cursor == 5) ? 0 : cursor + 1;
         } else {
             if (cursor == 2) data.wifiPower = (data.wifiPower <= 10) ? 0 : data.wifiPower - 10;
             if (cursor == 3) {
@@ -166,6 +170,8 @@ void Settings::handleInput() {
                 uint32_t current = data.sleepTimeout;
                 data.sleepTimeout = (current <= 10000) ? 10000 : current - 10000;
             }
+
+            if (cursor == 5) data.aodPin = (data.aodPin <= 0) ? 4 : data.aodPin - 1;
         }
     }
 

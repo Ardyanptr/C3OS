@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "../emergency/eme_restart.h"
+#include "app/Essential/Timer.h"
 #include "config/config.h"
 
 SemaphoreHandle_t displayMutex = xSemaphoreCreateMutex();
@@ -170,5 +171,15 @@ void BA_BATTERY(void* param) {
         }
 
         vTaskDelay(10 / portTICK_PERIOD_MS);  // kasih sedikit delay biar task lain jalan
+    }
+}
+
+void BA_TIMERTICK(void* param) {
+    TickType_t last = xTaskGetTickCount();
+
+    while (true) {
+        if (timerIsRunning) timerTick();
+
+        vTaskDelayUntil(&last, 1000 / portTICK_PERIOD_MS);
     }
 }
