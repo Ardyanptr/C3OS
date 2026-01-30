@@ -5,7 +5,8 @@
 
 typedef enum {
     BOOT_NORMAL,
-    BOOT_SAFE
+    BOOT_SAFE,
+    BOOT_FAST
 } boot_mode_t;
 
 RTC_DATA_ATTR extern boot_mode_t boot_mode;

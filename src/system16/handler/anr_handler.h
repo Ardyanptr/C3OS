@@ -23,8 +23,6 @@ extern bool anrActive;
 extern bool systemUIActive;
 
 inline void killCurrentApp() {
-    stopAllService();
-
     appRunning = false;
     currentApp = -1;
     anrActive = false;

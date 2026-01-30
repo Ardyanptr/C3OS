@@ -1,11 +1,13 @@
 #pragma once
+
 #include <Arduino.h>
 #include <OneButton.h>
 #include <U8g2lib.h>
+#include <WiFi.h>
 
+#include "app/Essential/Settings.h"
 #include "component/button.h"
 #include "icons/icon.h"
-#include "system16/esp826.h"
 
 extern U8G2_SSD1315_128X64_NONAME_F_HW_I2C display;
 extern OneButton btnUp;
@@ -15,8 +17,4 @@ extern OneButton btnAction;
 
 extern void drawMenu();
 
-void draw_waitESP8266Close();
-void draw_restarting();
-void draw_restartESP8266();
-
-void draw_Button(int pos, int count);
+void runGameMode();

@@ -1,5 +1,7 @@
 #include "GameClient_svc.h"
 
+#include "app/Game/GameMode.h"
+
 bool isGameRunning_StardewValleyCopy = true;
 
 GameClient_svc::GameClient_svc(int bL, int bR, int bA, int bOK)
@@ -41,6 +43,8 @@ void GameClient_svc::drawPlayer(int x, int y) {
 }
 
 void GameClient_svc::begin() {
+    runGameMode();
+
     pinMode(pinL, INPUT_PULLUP);
     pinMode(pinR, INPUT_PULLUP);
     pinMode(pinA, INPUT_PULLUP);

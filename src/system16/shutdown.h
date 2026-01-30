@@ -4,6 +4,8 @@
 #include <U8g2lib.h>
 #include <WiFi.h>
 
+#include "UI/floater.h"
+#include "app/Essential/Settings.h"
 #include "component/service.h"
 #include "emergency/eme_shutdown.h"
 #include "icons/bg.h"
@@ -18,25 +20,75 @@ extern OneButton btnAction;
 
 extern void drawMenu();
 
+inline void animateOLEDOff_Shutdown() {
+    const int W = 128;
+    const int H = 64;
+    const int START_BAND = 24;
+    const int DURATION = 400;
+
+    unsigned long t0 = millis();
+
+    while (true) {
+        float t = (millis() - t0) / (float)DURATION;
+        if (t > 1.0f) t = 1.0f;
+        float e = easeOutCubic(t);
+
+        int band = START_BAND - (int)(START_BAND * e);
+        if (band < 1) band = 1;
+        int y = (H - band) / 2;
+
+        display.clearBuffer();
+
+        display.drawBox(0, y, W, band);
+        display.sendBuffer();
+
+        if (t >= 1.0f) break;
+        delay(12);
+    }
+
+    display.setPowerSave(1);
+}
+
 inline void safe_shutdown() {
     stopAllService();
 
+    WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
-    delay(50);
-
     btStop();
     delay(50);
 
+    const char* shutdown_message = "Shutting Down...";
+    const int W = 128;
+    const int H = 64;
+
+    for (int i = 0; i < 20; i++) {
+        display.clearBuffer();
+        display.setFont(u8g2_font_5x8_tr);
+
+        int text_w = display.getStrWidth(shutdown_message);
+        display.drawStr(64 - (text_w / 2), 32, shutdown_message);
+
+        int current_contrast = 255 - (i * (255 / 20));
+        if (current_contrast < 0) current_contrast = 0;
+        display.setContrast(current_contrast);
+
+        display.sendBuffer();
+        delay(30);
+    }
+
+    animateOLEDOff_Shutdown();
+
     sendCommand("avr32:deep-sleep-manual");
+
     display.setContrast(0);
     display.setPowerSave(1);
-    delay(200);
 
+    esp_sleep_config_gpio_isolate();
     pinMode(GPIO_NUM_3, INPUT_PULLUP);
 
-    esp_deep_sleep_enable_gpio_wakeup(1ULL << GPIO_NUM_3, ESP_GPIO_WAKEUP_GPIO_LOW);
+    delay(200);
 
-    delay(100);
+    esp_deep_sleep_enable_gpio_wakeup(1ULL << GPIO_NUM_3, ESP_GPIO_WAKEUP_GPIO_LOW);
     esp_deep_sleep_start();
 }
 

@@ -5,6 +5,7 @@
 #include <WiFi.h>
 
 #include "component/service.h"
+#include "icons/icon.h"
 #include "system16/esp826.h"
 
 extern U8G2_SSD1315_128X64_NONAME_F_HW_I2C display;
@@ -16,6 +17,38 @@ extern OneButton btnAction;
 extern void drawMenu();
 
 inline void eme_restart_run() {
+    display.clearBuffer();
+    display.sendBuffer();
+
+    display.setFontMode(1);
+    display.setBitmapMode(1);
+
+    display.drawRFrame(1, 1, 72, 11, 3);
+    display.drawXBM(4, 3, 7, 7, image_Hashmark_bits);
+    display.setFont(u8g2_font_4x6_tr);
+    display.drawStr(14, 9, "Please Wait...");
+
+    display.drawRFrame(1, 14, 110, 48, 3);
+    display.drawStr(4, 32, "Emergency Restart!");
+    display.sendBuffer();
+
+    display.drawStr(8, 30, "- Turning Off Service...");
+    display.sendBuffer();
+    
+    stopAllService();
+
+    display.drawStr(8, 37, "- Unloading Components");
+    display.sendBuffer();
+
+    WiFi.mode(WIFI_OFF);
+    btStop();
+
+    display.drawStr(8, 44, "- Unloading ESP8266");
+    display.sendBuffer();
+
+    display.drawStr(4, 58, "Wait. May take a while!");
+    display.sendBuffer();
+
     sendCommand("32:start");
     delay(200);
     sendCommand("avr32:force-restart");

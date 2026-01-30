@@ -1,6 +1,9 @@
 #include "boot.h"
 
-// Helper
+#include "component/queuer.h"
+#include "system16/loader.h"
+#include "system16/state.h"
+
 void scanI2CBus();
 void showSuccessScreen();
 void showFinalErrorScreen();
@@ -10,8 +13,13 @@ uint8_t readEEPROM(uint16_t addr);
 void writeEEPROM(uint16_t addr, uint8_t val);
 
 extern uint32_t SLEEP_TIMEOUT;
+extern void enable_pm();
 
-// EEPROM
+uint16_t cpuFrequency = 160;
+
+RTC_DATA_ATTR int boot_count = 0;
+bool isFastBoot = false;
+
 void initEEPROM_Failed() {
     const unsigned long RECONNECT_TIMEOUT = 10000;
     const unsigned long RETRY_INTERVAL = 500;
@@ -193,7 +201,6 @@ bool eepromAvailable() {
     return (err == 0);
 }
 
-// I2C Scanner
 void scanI2CBus() {
     display.clearBuffer();
     display.setFont(u8g2_font_helvB08_tr);
@@ -220,10 +227,13 @@ void scanI2CBus() {
     delay(800);
 }
 
-// display add
 void fadeInOLED() {
     display.setPowerSave(0);
-    for (int c = 0; c <= 180; c += 3) {
+
+    display.clearBuffer();
+    display.sendBuffer();
+
+    for (int c = 0; c <= Settings::instance->get().oledContrast; c += 3) {
         display.setContrast(c);
         delay(5);
     }
@@ -280,7 +290,6 @@ void animateOLEDOff() {
     display.setPowerSave(1);
 }
 
-// sleep add
 void enterSleep() {
     animateOLEDOff();
     isOnSleepMode = true;
@@ -309,7 +318,6 @@ void enterSleep() {
     drawMenu();
 }
 
-// additional
 void log(String msg) {
     Serial.print("[");
     Serial.print("  " + String(millis()));
@@ -376,222 +384,226 @@ void logDelay(int ms) {
     }
 }
 
-// main
+// Main boot function
+void fast_boot() {
+    pinMode(BUTTON_ACTION, INPUT_PULLUP);
+    esp_log_level_set("*", ESP_LOG_INFO);
+
+    display.clearBuffer();
+    display.setBitmapMode(1);
+
+    display.drawXBM(58, 20, 11, 11, image_C3_bits);
+
+    display.sendBuffer();
+
+    fadeInOLED();
+
+    static float visualP = 0.0;
+
+    auto syncProgress = [&](float target) {
+        while (visualP < target) {
+            visualP += (target - visualP) * 0.15f + 0.005f;
+            if (visualP > target) visualP = target;
+
+            display.clearBuffer();
+
+            display.setBitmapMode(1);
+            display.drawXBM(58, 20, 11, 11, image_C3_bits);
+
+            float timeSec = millis() / 1000.0;
+            float breath = (sin(timeSec * 3.0) + 1.0) / 2.0;
+
+            int lineWidth = 10 + (int)(breath * 30);
+
+            display.drawHLine(64 - (lineWidth / 2), 52, lineWidth);
+
+            display.drawPixel(64 - (lineWidth / 2) - 3, 52);
+            display.drawPixel(64 + (lineWidth / 2) + 3, 52);
+
+            display.sendBuffer();
+            delay(15);
+
+            if (target - visualP < 0.005) {
+                visualP = target;
+                break;
+            }
+        }
+    };
+
+    initBackgroundManager();
+
+    esp_reset_reason_t cause = esp_reset_reason();
+    if (cause == ESP_RST_BROWNOUT) {
+        batteryDead();
+    }
+
+    Serial.println("[BOOT] Mounting LittleFS...");
+    syncProgress(0.3);
+    bool fsOk = LittleFS.begin(true);
+
+    Serial.println("[BOOT] Init Services...");
+    syncProgress(0.65);
+    registerService("CPUTemp", BA_CPUTemp, 2048);
+    registerService("WiFiCheck", BA_WiFi, 4096);
+    registerService("BATTERY", BA_BATTERY, 2048);
+    registerService("Timer", BA_TIMERTICK, 2048);
+    registerService("EME_RESTART", BA_EME_RESTART_COMBINATION, 2048);
+
+    syncProgress(0.95);
+    setting.loadSettings();
+    SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+    cpuFrequency = Settings::instance->get().cpuFrequency;
+    setCpuFrequencyMhz(cpuFrequency);
+
+    if (esp8266TaskHandle != NULL) vTaskSuspend(esp8266TaskHandle);
+    setupESP8266Communication();
+    sendCommand("32:start");
+    if (esp8266TaskHandle != NULL) vTaskResume(esp8266TaskHandle);
+
+    syncProgress(1.0);
+
+    display.clearBuffer();
+    display.sendBuffer();
+
+    boot_count = 0;
+    showLockscreen(true);
+}
+
 void full_boot() {
     pinMode(BUTTON_ACTION, INPUT_PULLUP);
-    esp_log_level_set("*", ESP_LOG_ERROR);
+    esp_log_level_set("*", ESP_LOG_INFO);
 
-    log("Drawing boot icon");
-    display.setBitmapMode(1);
-    display.clearBuffer();
-    display.drawXBM(60, 9, 11, 11, image_C3_bits);
-    display.drawXBM(36, 55, 57, 9, image_wondrlan_bits);
-    display.sendBuffer();
-    fadeInOLED();
-    delay(20);
-
-    Serial.printf(" [%6lu] DISPLAY DRAW ICON\n", millis());
-    Serial.printf("Chip Model : %s\n", ESP.getChipModel());
-    Serial.printf("Chip Rev   : %d\n", ESP.getChipRevision());
-
-    log("Checking wake source");
-
-    if (digitalRead(BUTTON_ACTION) == LOW) {
+    boot_count++;
+    if (boot_count > 3) {
+        boot_count = 0;
+        panic(PANIC_IPC_DROP, "RECOVERY MODE ACTIVE");
         runBIOS();
         return;
     }
 
-    esp_reset_reason_t cause = esp_reset_reason();
-    esp_sleep_wakeup_cause_t wake_cause = esp_sleep_get_wakeup_cause();
+    display.clearBuffer();
+    display.setBitmapMode(1);
 
-    if (wake_cause == ESP_SLEEP_WAKEUP_GPIO) {
-        smoothProgress(0.0, 0.5, 500);
+    display.drawXBM(58, 20, 11, 11, image_C3_bits);
 
-        setupESP8266Communication();
-        sendCommand("avr32:force-restart");
-        delay(50);
+    display.sendBuffer();
 
-        sendCommand("32:start");
-        registerService("CPUTemp", BA_CPUTemp, 2048);
-        registerService("WiFiCheck", BA_WiFi, 4096);
-        registerService("Led", BA_LED, 2048);
-        registerService("Heap Allocator", BA_HEAP_ALLOCATOR, 1024);
-        registerService("Button Reset Emergency", BA_EME_RESTART_COMBINATION, 1024);
-        registerService("BATTERY", BA_BATTERY, 2048);
+    fadeInOLED();
 
-        if (!LittleFS.begin(true)) {
-            panic(PANIC_LFS_MOUNT_FAILED, "Failed to mount FS!");
-        } else {
-            log("LittleFS Mounted!");
+    static float visualP = 0.0;
+
+    auto syncProgress = [&](float target) {
+        while (visualP < target) {
+            visualP += (target - visualP) * 0.15f + 0.005f;
+            if (visualP > target) visualP = target;
+
+            display.clearBuffer();
+
+            display.setBitmapMode(1);
+            display.drawXBM(58, 20, 11, 11, image_C3_bits);
+
+            float timeSec = millis() / 1000.0;
+            float breath = (sin(timeSec * 3.0) + 1.0) / 2.0;
+
+            int lineWidth = 10 + (int)(breath * 30);
+
+            display.drawHLine(64 - (lineWidth / 2), 52, lineWidth);
+
+            display.drawPixel(64 - (lineWidth / 2) - 3, 52);
+            display.drawPixel(64 + (lineWidth / 2) + 3, 52);
+
+            display.sendBuffer();
+            delay(15);
+
+            if (target - visualP < 0.005) {
+                visualP = target;
+                break;
+            }
         }
+    };
 
-        setting.loadSettings();
-        SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
-
-        startService();
-
-        smoothProgress(0.5, 1.0, 100);
-
-        showLockscreen(true);
+    syncProgress(0.15);
+    if (digitalRead(BUTTON_ACTION) == LOW) {
+        boot_count = 0;
+        runBIOS();
         return;
     }
 
-    if (cause == ESP_RST_PANIC || cause == ESP_RST_TASK_WDT || cause == ESP_RST_WDT) {
-        showCrashInfo();
-        return;
-    }
+    initBackgroundManager();
 
+    esp_reset_reason_t cause = esp_reset_reason();
     if (cause == ESP_RST_BROWNOUT) {
         batteryDead();
-        return;
     }
 
-    if (cause == ESP_RST_INT_WDT) {
-        panic(PANIC_IPC_DROP, "Watchdog Held Too Long");
-        return;
+    Serial.println("[BOOT] Mounting LittleFS...");
+    syncProgress(0.3);
+    bool fsOk = LittleFS.begin(true);
+
+    if (loadConfig()) {
+        Serial.println("Config Ready!");
+        delay(100);
     }
 
-    smoothProgress(0.0, 0.3, 600);
-
-    ledcDetachPin(6);
-    pinMode(6, OUTPUT);
-    digitalWrite(8, LOW);
-    delay(5);
-
-    log("Resetting WiFi stack");
-    WiFi.setSleep(false);
+    Serial.println("[BOOT] ReAllocating Heap...");
+    syncProgress(0.45);
     WiFi.mode(WIFI_OFF);
     esp_wifi_stop();
-    esp_wifi_deinit();
-    smoothProgress(0.3, 0.5, 900);
-    log("WiFi reset complete");
 
-    ledcSetup(0, 5000, 6);
-    ledcAttachPin(6, 1);
+    Serial.println("[BOOT] Init Services...");
+    syncProgress(0.65);
+    if (sysConfig.init_service) {
+        registerService("CPUTemp", BA_CPUTemp, 2048);
+        registerService("WiFiCheck", BA_WiFi, 4096);
+        registerService("BATTERY", BA_BATTERY, 2048);
+        registerService("Timer", BA_TIMERTICK, 2048);
+        registerService("EME_RESTART", BA_EME_RESTART_COMBINATION, 2048);
+    }
 
-    log("[mdloader/info]: VL53 test");
-    sensor.begin(0x29);
-    sensor.setMode(sensor.eContinuous, sensor.eHigh);
-    sensor.start();
+    Serial.println("[BOOT] Checking EEPROM...");
+    syncProgress(0.8);
+    if (sysConfig.init_eeprom) {
+        Wire.beginTransmission(0x50);
+        if (Wire.endTransmission() == 0) initEEPROM();
 
-    ledcSetup(0, 5000, 8);
-    ledcAttachPin(8, 0);
-
-    delay(40);
-    Serial.println(sensor.getDistance());
-    sensor.stop();
-    smoothProgress(0.5, 0.8, 1300);
-
-    log("Starting background services");
-    registerService("CPUTemp", BA_CPUTemp, 2048);
-    registerService("WiFiCheck", BA_WiFi, 4096);
-    registerService("Led", BA_LED, 2048);
-    registerService("Heap Allocator", BA_HEAP_ALLOCATOR, 1024);
-    registerService("Button Reset Emergency", BA_EME_RESTART_COMBINATION, 1024);
-    registerService("BATTERY", BA_BATTERY, 2048);
-    registerService("TimerTicker", BA_TIMERTICK, 2048);
-    smoothProgress(0.8, 0.9, 900);
-
-    log("Finalizing boot");
-
-    log("Init memory fence");
-    asm volatile("fence");
-    asm volatile("fence iorw, iorw");
-
-    for (int i = 0; i < 1000; i++) asm volatile("nop");
-
-    log("Init CSR");
-    asm volatile(
-        "csrr t0, mepc \n"
-        "csrw mscratch, t0 \n");
-
-    gPower.begin(PowerManager::Balanced);
-    gPower.setAutoSleepTimeout(0);
-    gPower.setPreSleepCallback([]() { stopAllService(); });
-    gPower.setPostWakeCallback([]() { startService(); });
-    gPower.setDisplayPowerCallback([](bool on) { if (on) fadeInOLED(); else fadeOutOLED(); });
-    smoothProgress(0.9, 1.0, 500);
-
-    Serial.println("I2C Scan...");
-    int nDevices = 0;
-    for (byte addr = 1; addr < 127; addr++) {
-        Wire.beginTransmission(addr);
-        if (Wire.endTransmission() == 0) {
-            Serial.print("Found I2C device at 0x");
-            Serial.println(addr, HEX);
-            nDevices++;
+        if (digitalRead(BUTTON_ACTION) == LOW) {
+            boot_count = 0;
+            runBIOS();
+            return;
         }
     }
-    Serial.println(nDevices ? "Scan done" : "No I2C devices found");
 
-    display.clearBuffer();
-
-    printLog("Setting up things...");
-    logDelay(100);
-
-    printLog("Setting up EEPROM...");
-    Wire.beginTransmission(0x50);
-    byte error = Wire.endTransmission();
-
-    printLog("Checking EEPROM...");
-    if (error == 0) {
-        printLog("EEPROM Detected!");
-    } else {
-        printLog("EEPROM Handshake Fail!");
-    }
-    logDelay(300);
-
-    printLog("Initialize EEPROM");
-    if (error == 0) {
-        printLog("Waiting EEPROM...");
-        initEEPROM();
-    } else {
-        printLog("EEPROM Init Failed");
-        initEEPROM_Failed();
-    }
-    logDelay(100);
-
-    printLog("Mounting FS");
-    if (!LittleFS.begin(true))
-        printLog("Failed to mount FS!");
-    else
-        printLog("LittleFS Mounted!");
-
-    logDelay(200);
-
-    delay(100);
-
-    printLog("Applying settings");
+    syncProgress(0.95);
     setting.loadSettings();
     SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+    cpuFrequency = Settings::instance->get().cpuFrequency;
+    setCpuFrequencyMhz(cpuFrequency);
 
-    uint32_t tmp;
-    if (loadSleep(tmp)) SLEEP_TIMEOUT = tmp;
-
-    logDelay(100);
-
-    File root = LittleFS.open("/");
-    File f = root.openNextFile();
-    while (f) {
-        Serial.println(f.name());
-        f = root.openNextFile();
+    if (!sysConfig.no_init) {
+        if (esp8266TaskHandle != NULL) vTaskSuspend(esp8266TaskHandle);
+        setupESP8266Communication();
+        sendCommand("32:start");
+        if (esp8266TaskHandle != NULL) vTaskResume(esp8266TaskHandle);
     }
-    root.close();
 
-    runLuaScript("/init.lua");
-    runLuaScript("/motd/rc_local.lua");
+    syncProgress(1.0);
+    delay(300);
 
-    delay(100);
-
-    log("Boot phase completed!");
-    setupESP8266Communication();
-    sendCommand("32:start");
+    display.clearBuffer();
+    display.sendBuffer();
 
     startService();
-    delay(100);
+    runLuaScript("/init.lua");
+
+    boot_count = 0;
+
+    if (digitalRead(BUTTON_ACTION) == LOW) {
+        boot_count = 0;
+        runBIOS();
+        return;
+    }
 
     showLockscreen(true);
-    drawMenu();
 }
 
 void safe_boot() {
@@ -625,6 +637,8 @@ void safe_boot() {
     registerService("Heap Allocator", BA_HEAP_ALLOCATOR, 1024);
     display.drawStr(1, 31, "Loaded Service");
     display.sendBuffer();
+
+    enable_pm();
 
     log("Finalizing boot");
 
@@ -669,10 +683,19 @@ void safe_boot() {
 }
 
 void boot() {
-    if (boot_mode == BOOT_SAFE) {
-        boot_mode = BOOT_NORMAL;
-        safe_boot();
+    if (LittleFS.begin(true)) {
+        isFastBoot = Settings::instance->get().fastboot;
+    }
+
+    if (isFastBoot) {
+        fast_boot();
+        return;
     } else {
-        full_boot();
+        if (boot_mode == BOOT_SAFE) {
+            boot_mode = BOOT_NORMAL;
+            safe_boot();
+        } else if (boot_mode == BOOT_NORMAL) {
+            full_boot();
+        }
     }
 }

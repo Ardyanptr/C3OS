@@ -1,7 +1,10 @@
 #pragma once
 #include <Arduino.h>
 
+#include "config/config.h"
 #include "config/var_declare.h"
+#include "crash_handler.h"
+#include "icons/icon.h"
 
 inline bool eepWriteTest() {
     Wire.beginTransmission(0x50);

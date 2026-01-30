@@ -25,6 +25,9 @@ class GameClient {
     float velY = 0.0f, camX = 0.0f, camY = 0.0f;
     bool onGround = false;
 
+    float gravity = 48.0f, velJump = -18.0f, moveSpeed = 14.0f;
+    String currentBiome = "forest";
+
     ModifiedBlock mods[MAX_MODS];
     int modCount = 0;
 
@@ -36,15 +39,17 @@ class GameClient {
 
     uint8_t getBlockAt(int x, int y);
     void addModification(int x, int y, uint8_t type);
-    void handleInteractions();
     void spawnMobs();
     void drawHUD(int fps);
     void drawClouds();
 
    public:
     GameClient(int bL, int bR, int bA, int bOK);
+    void loadSettings();
     void begin();
     void runGame();
+    void startMultiplayerSearch();
+    void runMultiplayerGame(IPAddress serverIP);
 };
 
 #endif

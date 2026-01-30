@@ -33,11 +33,26 @@ String VirtualKeyboard::run() {
         btnDown->tick();
         btnOk->tick();
 
-        smoothCol += (col - smoothCol) * 0.6;
-        smoothRow += (row - smoothRow) * 0.6;
+        if (btnUp->isLongPressed()) {
+            static unsigned long lastMove = 0;
+            if (millis() - lastMove > 100) {
+                onUpClick();
+                lastMove = millis();
+            }
+        }
+        if (btnDown->isLongPressed()) {
+            static unsigned long lastMove = 0;
+            if (millis() - lastMove > 100) {
+                onDownClick();
+                lastMove = millis();
+            }
+        }
+
+        smoothCol += (col - smoothCol) * 0.4;
+        smoothRow += (row - smoothRow) * 0.4;
 
         drawKeyboard();
-        delay(15);
+        delay(10);
     }
     return input;
 }
@@ -72,7 +87,14 @@ void VirtualKeyboard::drawKeyboard() {
             int px = startX + x * (keyW + 1);
             int py = startY + y * (keyH + 2);
 
-            u8g2->drawStr(px, py, displayKey);
+            if (x == col && y == row) {
+                u8g2->drawBox(px - 1, py - keyH + 1, keyW, keyH);
+                u8g2->setDrawColor(0);
+                u8g2->drawStr(px, py, displayKey);
+                u8g2->setDrawColor(1);
+            } else {
+                u8g2->drawStr(px, py, displayKey);
+            }
         }
     }
 

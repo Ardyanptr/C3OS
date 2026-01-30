@@ -91,9 +91,6 @@ namespace SYS {
 
 inline void handleMemEvent(MEM::Event ev, const char* svc = nullptr) {
     switch (ev) {
-        case MEM::Event::STACK_LOW:
-            stopService(svc);
-            break;
         case MEM::Event::HEAP_LOW:
             stopAllService();
             break;

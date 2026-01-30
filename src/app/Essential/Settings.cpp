@@ -2,6 +2,8 @@
 
 #include <WiFi.h>
 
+#include "system16/esp826.h"
+
 Settings* Settings::instance = nullptr;
 
 Settings::Settings() {
@@ -53,6 +55,7 @@ void Settings::load() {
                 bool crcValid = (data.checksum == calculateChecksum(data));
                 if (sigValid && crcValid) {
                     success = true;
+                    Serial.println(data.aodPin);
                 }
             }
             file.close();
@@ -66,7 +69,11 @@ void Settings::load() {
         data.wifiPower = 80;
         data.oledContrast = 150;
         data.sleepTimeout = 60000;
-        data.aodPin = 4;
+        data.aodPin = 3;
+        data.memFusion = 0;
+        data.cpuFrequency = 160;
+        data.gameMode = false;
+        data.fastboot = false;
         data.checksum = calculateChecksum(data);
     }
 }
@@ -89,6 +96,7 @@ void Settings::loadSettings() {
 
 void Settings::apply() {
     display.setContrast(data.oledContrast);
+
     uint32_t safeTimeout = max<uint32_t>(10000u, data.sleepTimeout);
 
     if (data.wifi) {
@@ -97,22 +105,45 @@ void Settings::apply() {
     } else {
         WiFi.mode(WIFI_OFF);
     }
+
+    if (data.memFusion == 0) {
+        Serial1.println("avr32:fusion-off");
+    } else if (data.memFusion == 1) {
+        Serial1.println("avr32:fusion-on:32");
+    } else if (data.memFusion == 2) {
+        Serial1.println("avr32:fusion-on:64");
+    }
+
+    setCpuFrequencyMhz(data.cpuFrequency);
 }
 
 void Settings::draw() {
     display.clearBuffer();
-    float targetY = cursor * itemHeight;
-    animCursorY += (targetY - animCursorY) * 0.3f;
+
+    float targetCursorY = cursor * itemHeight;
+    animCursorY += (targetCursorY - animCursorY) * 0.3f;
+
+    static float scrollY = 0;
+    float targetScrollY = 0;
+    if (cursor > 3) {
+        targetScrollY = (cursor - 3) * itemHeight;
+    }
+    scrollY += (targetScrollY - scrollY) * 0.2f;
+
+    const char* labels[] = {"Bluetooth", "WiFi Status", "TX Power", "Brightness", "Sleep", "AOD Wake", "Mem Fusion", "CPU Freq", "Game Mode", "Fastboot"};
+    uint8_t totalItems = sizeof(labels) / sizeof(labels[0]);
 
     display.setDrawColor(1);
-    display.drawRBox(0, (int)animCursorY + 1, 128, 12, 2);
+    display.drawRBox(0, (int)(animCursorY - scrollY) + 1, 128, 12, 2);
 
-    const char* labels[] = {"Bluetooth", "WiFi Status", "TX Power", "Brightness", "Sleep", "AOD Wake"};
+    for (uint8_t i = 0; i < totalItems; i++) {
+        int yPos = 11 + (i * itemHeight) - (int)scrollY;
 
-    for (uint8_t i = 0; i < 6; i++) {
+        if (yPos < -10 || yPos > 74) continue;
+
         display.setDrawColor(i == cursor ? 0 : 1);
         display.setFont(u8g2_font_6x10_tf);
-        display.drawStr(5, 11 + (i * itemHeight), labels[i]);
+        display.drawStr(5, yPos, labels[i]);
 
         char buf[20];
         if (i == 0)
@@ -127,16 +158,29 @@ void Settings::draw() {
             snprintf(buf, sizeof(buf), "%lus", (unsigned long)(data.sleepTimeout / 1000));
         else if (i == 5)
             snprintf(buf, sizeof(buf), "GPIO %d", data.aodPin);
+        else if (i == 6) {
+            if (data.memFusion == 0)
+                strcpy(buf, "OFF");
+            else if (data.memFusion == 1)
+                strcpy(buf, "32KB");
+            else if (data.memFusion == 2)
+                strcpy(buf, "64KB");
+        } else if (i == 7) {
+            snprintf(buf, sizeof(buf), "%dMHz", data.cpuFrequency);
+        } else if (i == 8) {
+            strcpy(buf, data.gameMode ? "ON" : "OFF");
+        } else if (i == 9) {
+            strcpy(buf, data.fastboot ? "ON" : "OFF");
+        }
 
         if (editing && i == cursor) {
-            char editBuf[25];
+            char editBuf[30];
             snprintf(editBuf, sizeof(editBuf), "[%s]", buf);
-            display.drawStr(123 - display.getStrWidth(editBuf), 11 + (i * itemHeight), editBuf);
+            display.drawStr(123 - display.getStrWidth(editBuf), yPos, editBuf);
         } else {
-            display.drawStr(123 - display.getStrWidth(buf), 11 + (i * itemHeight), buf);
+            display.drawStr(123 - display.getStrWidth(buf), yPos, buf);
         }
     }
-
     display.sendBuffer();
 }
 
@@ -144,7 +188,7 @@ void Settings::handleInput() {
     if (flagUp) {
         flagUp = false;
         if (!editing) {
-            cursor = (cursor == 0) ? 5 : cursor - 1;
+            cursor = (cursor == 0) ? 9 : cursor - 1;
         } else {
             if (cursor == 2) data.wifiPower = (data.wifiPower >= 100) ? 100 : data.wifiPower + 10;
             if (cursor == 3) {
@@ -152,14 +196,16 @@ void Settings::handleInput() {
                 display.setContrast(data.oledContrast);
             }
             if (cursor == 4) data.sleepTimeout += 10000;
-            if (cursor == 5) data.aodPin = (data.aodPin >= 4) ? 0 : data.aodPin + 1;
+            if (cursor == 5) data.aodPin = (data.aodPin >= 3) ? 0 : data.aodPin + 1;
+            if (cursor == 6) data.memFusion = (data.memFusion >= 2) ? 0 : data.memFusion + 1;
+            if (cursor == 7) data.cpuFrequency = (data.cpuFrequency >= 160) ? 40 : data.cpuFrequency + 40;
         }
     }
 
     if (flagDown) {
         flagDown = false;
         if (!editing) {
-            cursor = (cursor == 5) ? 0 : cursor + 1;
+            cursor = (cursor == 9) ? 0 : cursor + 1;
         } else {
             if (cursor == 2) data.wifiPower = (data.wifiPower <= 10) ? 0 : data.wifiPower - 10;
             if (cursor == 3) {
@@ -171,15 +217,20 @@ void Settings::handleInput() {
                 data.sleepTimeout = (current <= 10000) ? 10000 : current - 10000;
             }
 
-            if (cursor == 5) data.aodPin = (data.aodPin <= 0) ? 4 : data.aodPin - 1;
+            if (cursor == 5) data.aodPin = (data.aodPin <= 0) ? 3 : data.aodPin - 1;
+            if (cursor == 6) data.memFusion = (data.memFusion == 0) ? 2 : data.memFusion - 1;
+            if (cursor == 7) data.cpuFrequency = (data.cpuFrequency <= 40) ? 160 : data.cpuFrequency - 40;
         }
     }
 
     if (flagOK) {
         flagOK = false;
-        if (cursor < 2) {
+        if (cursor == 0 || cursor == 1 || cursor == 8 || cursor == 9) {
             if (cursor == 0) data.bluetooth = !data.bluetooth;
             if (cursor == 1) data.wifi = !data.wifi;
+            if (cursor == 8) data.gameMode = !data.gameMode;
+            if (cursor == 9) data.fastboot = !data.fastboot;
+
             save();
             apply();
         } else {

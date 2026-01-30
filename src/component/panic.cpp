@@ -2,6 +2,8 @@
 
 #include <esp_task_wdt.h>
 
+#include "UI/recovery.h"
+
 static bool panicInProgress = false;
 static bool exitPanicSignal = false;
 

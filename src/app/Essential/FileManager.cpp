@@ -1,3 +1,4 @@
+
 #include "FileManager.h"
 
 #include <LittleFS.h>
@@ -5,6 +6,8 @@
 #include <vector>
 
 #include "system16/lua_l/lua_l.h"
+
+extern portMUX_TYPE btnMux;
 
 struct FileItem {
     char name[64];
@@ -174,35 +177,42 @@ static void drawUI() {
 }
 
 void runFileManager() {
-    exitManager = false;
-    cursor = 0;
-    scrollOffset = 0;
-    pendingLua[0] = 0;
+    bool closedCompletely = false;
 
-    scanDirectory();
-
-    btnUp.attachClick(onUp);
-    btnDown.attachClick(onDown);
-    btnOK.attachClick(onOK);
-    btnOK.attachLongPressStart(onExit);
-
-    while (!exitManager) {
-        btnUp.tick();
-        btnDown.tick();
-        btnOK.tick();
-        drawUI();
-        delay(5);
-    }
-
-    drawMenu();
-
-    if (pendingLua[0]) {
-        runLuaScript(pendingLua);
+    while (!closedCompletely) {
+        exitManager = false;
+        cursor = 0;
+        scrollOffset = 0;
         pendingLua[0] = 0;
+
+        scanDirectory();
 
         btnUp.attachClick(onUp);
         btnDown.attachClick(onDown);
         btnOK.attachClick(onOK);
         btnOK.attachLongPressStart(onExit);
+
+        while (!exitManager) {
+            btnUp.tick();
+            btnDown.tick();
+            btnOK.tick();
+            drawUI();
+            delay(5);
+        }
+
+        if (pendingLua[0] != 0) {
+            display.clearBuffer();
+            display.drawStr(30, 32, "Loading Lua...");
+            display.sendBuffer();
+
+            runLuaScript(pendingLua);
+
+            pendingLua[0] = 0;
+            delay(200);
+        } else {
+            closedCompletely = true;
+        }
     }
+
+    drawMenu();
 }

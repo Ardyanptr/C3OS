@@ -1,9 +1,13 @@
 #include "GameClient_Doom.h"
 
+#include "app/Game/GameMode.h"
+
 GameClient_Doom::GameClient_Doom(int bL, int bR, int bA, int bOK)
     : pinL(bL), pinR(bR), pinA(bA), pinOK(bOK) {}
 
 void GameClient_Doom::begin() {
+    runGameMode();
+
     pinMode(pinL, INPUT_PULLUP);
     pinMode(pinR, INPUT_PULLUP);
     pinMode(pinA, INPUT_PULLUP);

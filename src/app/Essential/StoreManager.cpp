@@ -49,6 +49,9 @@ int cursor_Store = 0;
 int offset_Store = 0;
 int selected_Store = -1;
 int downloadProgress_Store = 0;
+int totalBytes_Store = 0;
+int currentBytes_Store = 0;
+int chunkCount_Store = 0;
 
 static bool pendingInstall_Store = false;
 static bool sensitiveDetected_Store = false;
@@ -276,6 +279,16 @@ void drawInstalling_Store() {
     display.setFont(u8g2_font_4x6_tr);
     display.drawStr(10, 20, loadingText.c_str());
 
+    char infoBuf[32];
+
+    snprintf(infoBuf, sizeof(infoBuf), "Data: %d / % d B", currentBytes_Store, totalBytes_Store);
+    display.drawStr(10, 32, infoBuf);
+
+    snprintf(infoBuf, sizeof(infoBuf), "Chunk: #%d (OK)", chunkCount_Store);
+    display.drawStr(10, 39, infoBuf);
+
+    display.drawStr(10, 48, "Target: /bin");
+
     display.drawRFrame(10, 58, 108, 5, 2);
 
     visualProgress_Store += (downloadProgress_Store - visualProgress_Store) * 0.2;
@@ -359,7 +372,10 @@ bool downloadApp_Store(String url, String file) {
 
     int total = http.getSize();
     if (total <= 0) total = 1;
+
     int downloaded = 0;
+    chunkCount_Store = 0;
+    totalBytes_Store = total;
 
     while (downloadProgress_Store < 100 || visualProgress_Store < 99.5) {
         if (s->available()) {
@@ -367,6 +383,10 @@ bool downloadApp_Store(String url, String file) {
             int r = s->readBytes(buf, MIN(len, sizeof(buf)));
             f.write(buf, r);
             downloaded += r;
+
+            currentBytes_Store = downloaded;
+            chunkCount_Store++;
+
             downloadProgress_Store = MIN((downloaded * 100) / total, 100);
         }
 

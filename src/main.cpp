@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 #include "LittleFS.h"
 #include "config/config.h"
@@ -10,13 +11,13 @@
 #include "include/SystemCoreLib.h"
 #include "include/UILib.h"
 #include "include/WiFiAppLib.h"
+#include "system16/loader.h"
 
 String BOARD_ATTACHED = "ESP32-C3";
 int BOARD_REV = 4;
 
 extern "C" void esp_panic_handler() {
     Serial.println("System on Panic Mode!");
-    stopAllService();
     panic(PANIC_UNKNOWN, "CPU exception");
 }
 
@@ -134,7 +135,7 @@ void enable_pm() {
     esp_pm_config_esp32c3_t pm = {
         .max_freq_mhz = 160,
         .min_freq_mhz = 40,
-        .light_sleep_enable = true};
+        .light_sleep_enable = false};
 
     esp_pm_configure(&pm);
 }
@@ -154,15 +155,15 @@ const char* menuItems[] = {
     "Factory Reset", "Check System Integrity", "Online Story", "Heap Monitor",
     "Stopwatch", "BenchMyESP", "Minecraft", "Stardew Valley", "BLE Scan", "C3 Burner",
     "WiFi Telnet", "Doom GL", "File Manager", "Store Manager", "Timer"};
-const int menuCount = sizeof(menuItems) / sizeof(menuItems[0]);
 
-const int visibleItems = 6;
-const int SCROLL_DURATION = 300;
+const int menuCount = sizeof(menuItems) / sizeof(menuItems[0]);
+const int visibleItem = sysConfig.visible_items;
 const int NOTIFICATION_DURATION = 2000;
 
 unsigned long scrollStartTime = 0;
 unsigned long notificationStart = 0;
 
+int SCROLL_DURATION = sysConfig.scroll_duration;
 int menuIndex = 0;
 int menuScrollOffset = 0;
 int targetMenuIndex = 0;
@@ -175,7 +176,6 @@ bool isEjected = false;
 String notificationText = "";
 
 void initMenuButton();
-
 void IRAM_ATTR onButton() {
     lastActive = millis();
 }
@@ -234,8 +234,9 @@ void showActionGUI() {
 }
 
 void drawMenuItemsWithOffset(float scrollOffset) {
-    const int textOffsetY = 12;
-    const int drawCount = 5;
+    SCROLL_DURATION = sysConfig.scroll_duration;
+    const int textOffsetY = sysConfig.text_offset_y;
+    const int drawCount = sysConfig.draw_count;
 
     int intOffset = (int)floor(scrollOffset);
     float fractionalOffset = scrollOffset - (float)intOffset;
@@ -274,8 +275,8 @@ void drawMenu() {
 
     appRunning = false;
     currentApp = -1;
-    anrActive = false;
-    systemUIActive = true;
+    anrActive = sysConfig.anr_active;
+    systemUIActive = sysConfig.system_ui_active;
 
     display.setFont(u8g2_font_7x14_tr);
     display.clearBuffer();
@@ -335,9 +336,36 @@ void runApp(int index) {
     if (index < 0 || index >= menuCount) return;
 
     AppDesc& app = appTable[index];
-    if (ESP.getFreeHeap() < app.minHeap) return
+    if (ESP.getFreeHeap() < app.minHeap) return;
 
-        stopAllService();
+    int startW = 20;
+    int startH = 10;
+    int startX = 64 - (startW / 2);
+    int startY = 32 - (startH / 2);
+
+    for (int i = 0; i <= 10; i++) {
+        float t = i / 10.0f;
+        float e = easeOutCubic(t);
+
+        int curW = startW + (int)((128 - startW) * e);
+        int curH = startH + (int)((64 - startH) * e);
+        int curX = 64 - (curW / 2);
+        int curY = 32 - (curH / 2);
+
+        display.setDrawColor(1);
+        display.drawRBox(curX, curY, curW, curH, 4 - (int)(4 * e));
+
+        if (i < 7) {
+            display.setDrawColor(0);
+            display.setFont(u8g2_font_5x8_tr);
+
+            int tw = display.getStrWidth(app.name);
+            display.drawStr(64 - (tw / 2), 32 + 3, app.name);
+        }
+
+        display.sendBuffer();
+        delay(15);
+    }
 
     currentApp = index;
     appRunning = true;
@@ -348,6 +376,11 @@ void runApp(int index) {
 
     appRunning = false;
     currentApp = -1;
+
+    display.clearBuffer();
+    display.sendBuffer();
+
+    drawMenu();
 }
 
 void initMenuButton() {
@@ -421,7 +454,7 @@ void loop() {
 
     if (pendingLockscreen) {
         pendingLockscreen = false;
-        startAOD();
+        showLockscreen(true);
     }
 
     if (isScrolling) drawMenu();

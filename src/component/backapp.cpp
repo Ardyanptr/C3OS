@@ -1,8 +1,10 @@
 #include "backapp.h"
 
 #include <Arduino.h>
+#include <WiFiManager.h>
 
 #include "../emergency/eme_restart.h"
+#include "app/Essential/Settings.h"
 #include "app/Essential/Timer.h"
 #include "config/config.h"
 
@@ -15,6 +17,8 @@ void BA_CPUTemp(void* param) {
     temp_sensor_start();
 
     while (true) {
+        updateServiceHeartbeat((const char*)param);
+
         float result = 0;
         temp_sensor_read_celsius(&result);
 
@@ -29,27 +33,46 @@ void BA_CPUTemp(void* param) {
 }
 
 void BA_WiFi(void* param) {
-    String ssid, pass;
-    loadWiFi(ssid, pass);
+    int animFrame = 0;
 
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid.c_str(), pass.c_str());
+    WiFi.setAutoReconnect(true);
+
+    if (Settings::instance->get().wifi) {
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.begin();
+    }
 
     while (true) {
-        if (WiFi.status() != WL_CONNECTED) {
-            WiFi.reconnect();
+        updateServiceHeartbeat((const char*)param);
+
+        if (Settings::instance->get().wifi) {
+            display.setDrawColor(0);
+            display.drawBox(116, 0, 12, 2);
+            display.setDrawColor(1);
+
+            if (WiFi.status() == WL_CONNECTED) {
+                display.drawBox(126, 0, 2, 2);
+            } else {
+                int xPos = 120 + (animFrame * 2);
+                display.drawBox(xPos, 0, 2, 2);
+
+                animFrame++;
+                if (animFrame > 3) animFrame = 0;
+            }
+
+            if (WiFi.softAPgetStationNum() > 0) {
+                display.drawBox(116, 0, 2, 2);
+            }
+
+            display.sendBuffer();
+        } else {
+            if (WiFi.status() == WL_CONNECTED || WiFi.getMode() != WIFI_OFF) {
+                WiFi.disconnect(true);
+                WiFi.mode(WIFI_OFF);
+            }
         }
 
-        if (WiFi.status() == WL_CONNECTED) {
-            display.drawBox(126, 0, 2, 2);
-        }
-
-        if (WiFi.softAPgetStationNum() > 0) {
-            display.drawBox(121, 0, 4, 2);
-        }
-
-        display.sendBuffer();
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(1500 / portTICK_PERIOD_MS);
     }
 }
 
@@ -58,6 +81,8 @@ void BA_LED(void* param) {
     int fadeAmount = 1;
 
     while (true) {
+        updateServiceHeartbeat((const char*)param);
+
         for (int duty = 0; duty <= 255; duty++) {
             ledcWrite(0, duty);
             vTaskDelay(5 / portTICK_PERIOD_MS);
@@ -81,6 +106,8 @@ void BA_HEAP_ALLOCATOR(void* param) {
     memset(blocks, 0, sizeof(blocks));
 
     for (;;) {
+        updateServiceHeartbeat((const char*)param);
+
         size_t freeHeap = ESP.getFreeHeap();
         size_t minFree = ESP.getMinFreeHeap();
 
@@ -124,6 +151,8 @@ void BA_HEAP_ALLOCATOR(void* param) {
 
 void BA_EME_RESTART_COMBINATION(void* param) {
     while (true) {
+        updateServiceHeartbeat((const char*)param);
+
         if (digitalRead(BUTTON_OK) == LOW && digitalRead(BUTTON_ACTION) == LOW && digitalRead(BUTTON_UP) == LOW) {
             eme_restart_run();
         }
@@ -137,6 +166,8 @@ void BA_BATTERY(void* param) {
     const unsigned long interval = 3000;  // update tiap 3 detik
 
     while (true) {
+        updateServiceHeartbeat((const char*)param);
+
         unsigned long now = millis();
         if (now - lastRead >= interval) {
             lastRead = now;
@@ -178,6 +209,8 @@ void BA_TIMERTICK(void* param) {
     TickType_t last = xTaskGetTickCount();
 
     while (true) {
+        updateServiceHeartbeat((const char*)param);
+
         if (timerIsRunning) timerTick();
 
         vTaskDelayUntil(&last, 1000 / portTICK_PERIOD_MS);

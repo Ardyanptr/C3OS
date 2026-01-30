@@ -1,0 +1,9 @@
+{
+    "boot": {
+        "init_tof": true,
+        "init_eeprom": true,
+        "init_service": true,
+        "ignore_hardware": false,
+        "no_init": false
+    } 
+}

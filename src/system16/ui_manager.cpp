@@ -1,5 +1,6 @@
-#include <Arduino.h>
 #include "ui_manager.h"
+
+#include <Arduino.h>
 
 void draw_waitESP8266Close() {
     display.clearBuffer();
@@ -49,4 +50,41 @@ void draw_restartESP8266() {
 
     display.drawBox(29, 35, 69, 5);
     display.sendBuffer();
+}
+
+void draw_Button(int pos, int count) {
+    switch (pos) {
+        case 0:
+            display.drawRBox(1, 54, 24, 9, 3);
+
+            display.setDrawColor(2);
+            display.setFont(u8g2_font_4x6_tr);
+            display.drawStr(9, 61, "OK");
+
+            if (count == 2) {
+                display.setDrawColor(1);
+
+                display.drawRFrame(27, 54, 35, 9, 3);
+                display.drawStr(32, 61, "CANCEL");
+            }
+
+            display.sendBuffer();
+            break;
+        case 1:
+            display.drawRBox(1, 54, 24, 9, 3);
+
+            display.setDrawColor(2);
+            display.setFont(u8g2_font_4x6_tr);
+            display.drawStr(count == 2 ? 74 : 110, 61, "OK");
+
+            if (count == 2) {
+                display.setDrawColor(1);
+
+                display.drawRFrame(27, 54, 35, 9, 3);
+                display.drawStr(97, 61, "CANCEL");
+            }
+
+            display.sendBuffer();
+            break;
+    }
 }

@@ -42,7 +42,8 @@ void setupESP8266Communication() {
     Serial.println("GPIO6(RX) <- ESP8266 TX(D7)");
     Serial.println("GPIO7(TX) -> ESP8266 RX(D6)");
 
-    Serial1.begin(9600, SERIAL_8N1, ESP8266_RX, ESP8266_TX);
+    Serial1.setRxBufferSize(2048);
+    Serial1.begin(115200, SERIAL_8N1, ESP8266_RX, ESP8266_TX);
 
     xTaskCreatePinnedToCore(
         esp8266CommunicationTask,

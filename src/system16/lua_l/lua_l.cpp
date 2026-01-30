@@ -17,14 +17,81 @@ extern "C" {
 
 #include "button_state.h"
 #include "esp_task_wdt.h"
+#include "icons/icon.h"
+#include "system16/MemFusion/MemFusion.h"
 
-// Guard
 static bool luaRunning = false;
 
-// MUX
 portMUX_TYPE btnMux = portMUX_INITIALIZER_UNLOCKED;
 
-// Display
+// Start of panic
+bool halt = true;
+
+void lua_not_respond() {
+    display.setFontMode(1);
+    display.setBitmapMode(1);
+    display.drawRFrame(23, 12, 82, 39, 5);
+
+    display.drawXBM(26, 15, 9, 8, image_Alert_bits);
+
+    display.setFont(u8g2_font_4x6_tr);
+    display.drawStr(38, 21, "Not Responding");
+
+    display.drawStr(26, 30, "App doesn't respond");
+    display.drawStr(26, 36, "Try opneing again!");
+
+    display.setDrawColor(1);
+    display.drawRFrame(26, 39, 24, 9, 3);
+
+    display.drawStr(61, 46, "Exit");
+    display.sendBuffer();
+
+    btnOK.attachClick([]() {
+        display.clearBuffer();
+        display.sendBuffer();
+
+        halt = false;
+        delay(100);
+    });
+
+    while (halt) {
+        delay(10);
+        btnOK.tick();
+    }
+
+    drawMenu();
+}
+
+// End Of Panic
+
+const char* lua_stream_reader(lua_State* L, void* data, size_t* size) {
+    UARTLuaReader* reader = (UARTLuaReader*)data;
+    static char buffer[128];
+
+    if (reader->done) return NULL;
+
+    unsigned long start = millis();
+    while (Serial1.available() == 0) {
+        if (millis() - start > 2000) {
+            reader->done = true;
+            return NULL;
+        }
+    }
+
+    size_t i = 0;
+    while (Serial1.available() > 0 && i < sizeof(buffer)) {
+        char c = Serial1.read();
+
+        if (c == 4) {
+            reader->done = true;
+        }
+        buffer[i++] = c;
+    }
+
+    *size = i;
+    return buffer;
+}
+
 int l_c3_display_print(lua_State* L) {
     const char* txt = luaL_checkstring(L, 1);
     int x = luaL_checkinteger(L, 2);
@@ -66,6 +133,17 @@ int l_c3_drawBox(lua_State* L) {
     return 0;
 }
 
+int l_c3_drawRFrame(lua_State* L) {
+    int x = luaL_checkinteger(L, 1);
+    int y = luaL_checkinteger(L, 2);
+    int w = luaL_checkinteger(L, 3);
+    int h = luaL_checkinteger(L, 4);
+    int r = luaL_checkinteger(L, 5);
+
+    display.drawRFrame(x, y, w, h, r);
+    return 0;
+}
+
 int l_c3_drawLine(lua_State* L) {
     int x0 = luaL_checkinteger(L, 1);
     int y0 = luaL_checkinteger(L, 2);
@@ -98,6 +176,9 @@ int l_c3_setFont(lua_State* L) {
         case 3:
             display.setFont(u8g2_font_ncenB14_tr);
             break;
+        case 4:
+            display.setFont(u8g2_font_4x6_tr);
+            break;
         default:
             display.setFont(u8g2_font_5x7_tr);
             break;
@@ -106,14 +187,34 @@ int l_c3_setFont(lua_State* L) {
     return 0;
 }
 
-// Print
+int l_c3_drawBitmap(lua_State* L) {
+    int x = luaL_checkinteger(L, 1);
+    int y = luaL_checkinteger(L, 2);
+    int w = luaL_checkinteger(L, 3);
+    int h = luaL_checkinteger(L, 4);
+    const char* name = luaL_checkstring(L, 5);
+
+    const uint8_t* bitmapPointer = nullptr;
+
+    if (strcmp(name, "image_Rpc_active_bits") == 0) {
+        bitmapPointer = image_Rpc_active_bits;
+    }
+
+    if (bitmapPointer != nullptr) {
+        display.drawXBM(x, y, w, h, bitmapPointer);
+    } else {
+        Serial.printf("[LUA/UI/ERROR]: Can't find bitmap %s!\n", name);
+    }
+
+    return 0;
+}
+
 int l_c3_print(lua_State* L) {
     const char* msg = luaL_checkstring(L, 1);
     Serial.println(msg);
     return 0;
 }
 
-// Power Managing
 int l_c3_get_into_powersave(lua_State* L) {
     WiFi.setTxPower(WIFI_POWER_8_5dBm);
     WiFi.mode(WIFI_OFF);
@@ -140,14 +241,12 @@ int l_c3_set_cpu_clock(lua_State* L) {
     return 0;
 }
 
-// Storage
 int l_c3_file_exists(lua_State* L) {
     const char* path = luaL_checkstring(L, 1);
     lua_pushboolean(L, LittleFS.exists(path));
     return 1;
 }
 
-// Accessories
 int l_c3_get_heap_kb(lua_State* L) {
     lua_pushinteger(L, ESP.getFreeHeap() / 1024);
     return 1;
@@ -175,7 +274,6 @@ int l_c3_sleep(lua_State* L) {
     return 0;
 }
 
-// WiFi
 int l_c3_http_get(lua_State* L) {
     const char* url = luaL_checkstring(L, 1);
 
@@ -200,10 +298,6 @@ int l_c3_http_get(lua_State* L) {
     return 1;
 }
 
-// Button
-
-// Enum: 1 = click, 2 = double, 3 = long
-
 void evUp() { btnUp_Event = BTN_CLICK; }
 void evDown() { btnDown_Event = BTN_CLICK; }
 void evOK() { btnOK_Event = BTN_CLICK; }
@@ -219,9 +313,9 @@ void initButtons() {
     btnAction.attachClick(evAction);
 
     btnOK.attachDoubleClick([]() { btnOK_Event = BTN_DOUBLE; });
-    btnOK.attachLongPressStop([]() { btnOK_Event = BTN_LONG; });
+    btnOK.attachLongPressStart([]() { btnOK_Event = BTN_LONG; });
 
-    btnAction.attachLongPressStop([]() { btnAction_Event = BTN_LONG; });
+    btnAction.attachLongPressStart([]() { btnAction_Event = BTN_LONG; });
 }
 
 int l_c3_btn(lua_State* L) {
@@ -238,7 +332,7 @@ int l_c3_btn(lua_State* L) {
         ev = &btnAction_Event;
 
     if (!ev) {
-        lua_pushinteger(L, BTN_NONE);
+        lua_pushinteger(L, 0);
         return 1;
     }
 
@@ -248,11 +342,12 @@ int l_c3_btn(lua_State* L) {
     *ev = BTN_NONE;
     portEXIT_CRITICAL(&btnMux);
 
-    lua_pushinteger(L, out);
+    if (out != 0) Serial.printf("C++ sending event %d to Lua\n", out);
+
+    lua_pushinteger(L, (int)out);
     return 1;
 }
 
-// Weather
 int l_c3_get_weather(lua_State* L) {
     WiFiManager wm;
 
@@ -280,7 +375,7 @@ int l_c3_get_weather(lua_State* L) {
     int httpCode = http.GET();
 
     if (httpCode == HTTP_CODE_OK) {
-        DynamicJsonDocument doc(1024);
+        DynamicJsonDocument doc(2048);
         if (deserializeJson(doc, http.getStream())) {
             http.end();
             lua_pushnil(L);
@@ -321,10 +416,12 @@ void runLuaScript(const char* path) {
     lua_register(L, "c3_cls", l_c3_display_cls);
     lua_register(L, "c3_update", l_c3_display_update);
     lua_register(L, "c3_draw_frame", l_c3_drawFrame);
+    lua_register(L, "c3_drawRFrame", l_c3_drawRFrame);
     lua_register(L, "c3_draw_box", l_c3_drawBox);
     lua_register(L, "c3_draw_line", l_c3_drawLine);
     lua_register(L, "c3_draw_hline", l_c3_drawHLine);
     lua_register(L, "c3_set_font", l_c3_setFont);
+    lua_register(L, "c3_drawBitmap", l_c3_drawBitmap);
 
     lua_register(L, "print", l_c3_print);
 
@@ -342,30 +439,110 @@ void runLuaScript(const char* path) {
     lua_register(L, "c3_http_get", l_c3_http_get);
     lua_register(L, "c3_get_weather", l_c3_get_weather);
 
-    char fixedPath[64];
-    if (path[0] != '/')
-        snprintf(fixedPath, sizeof(fixedPath), "/%s", path);
-    else
-        strncpy(fixedPath, path, sizeof(fixedPath) - 1);
+    String luaCode = swapPull(99);
 
-    File file = LittleFS.open(fixedPath, "r");
-    if (!file) {
-        Serial.printf("Lua file not found! %s\n", fixedPath);
-        return;
+    luaRunning = true;
+
+    initButtons();
+
+    portENTER_CRITICAL(&btnMux);
+    btnUp_Event = BTN_NONE;
+    btnDown_Event = BTN_NONE;
+    btnOK_Event = BTN_NONE;
+    btnAction_Event = BTN_NONE;
+    portEXIT_CRITICAL(&btnMux);
+
+    if (Settings::instance->get().memFusion == 0) {
+        char fixedPath[128];
+        if (path[0] != '/')
+            snprintf(fixedPath, sizeof(fixedPath), "/%s", path);
+        else
+            strncpy(fixedPath, path, sizeof(fixedPath) - 1);
+
+        File file = LittleFS.open(fixedPath, "r");
+        if (!file) {
+            Serial.printf("Lua file not found! %s\n", fixedPath);
+            return;
+        }
+
+        size_t len = file.size();
+        char* buf = new char[len + 1];
+        file.readBytes(buf, len);
+        buf[len] = 0;
+        file.close();
+
+        int loadStatus = luaL_loadbuffer(L, buf, len, fixedPath);
+
+        delete[] buf;
+
+        if (loadStatus == LUA_OK) {
+            if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+                String err = lua_tostring(L, -1);
+                lua_close(L);
+                luaRunning = false;
+                lua_not_respond();
+            }
+        } else {
+            String err = lua_tostring(L, -1);
+            lua_close(L);
+            luaRunning = false;
+            lua_not_respond();
+        }
+
+        lua_close(L);
+        luaRunning = false;
+    } else {
+        Serial1.println("avr32:fusion-on:64");
+        delay(100);  // Beri waktu ESP8266 untuk mount LittleFS
+
+        File file = LittleFS.open(path, "r");
+        if (file) {
+            Serial1.println("mem:push:99:start");
+            // Tunggu sampai ESP8266 menjawab STATUS:READY
+            delay(50);
+
+            while (file.available()) {
+                String line = file.readStringUntil('\n');
+                line.trim();
+                if (line.length() > 0) {
+                    Serial1.print("mem:push:99:add:");
+                    Serial1.println(line);
+                    delay(5);  // Jeda sangat singkat
+                }
+            }
+            file.close();
+            Serial1.println("mem:push:99:end");
+
+            unsigned long startWait = millis();
+            while (millis() - startWait < 1000) {
+                if (Serial1.available()) {
+                    String res = Serial1.readStringUntil('\n');
+                    if (res.indexOf("STATUS:PUSH_OK") != -1) break;
+                }
+            }
+        }
+
+        while (Serial1.available()) Serial1.read();
+        Serial1.println("mem:pull:99");
+
+        UARTLuaReader readerState = {false};
+
+        if (lua_load(L, lua_stream_reader, &readerState, path, NULL) != LUA_OK) {
+            Serial.printf("Streaming Load Error: %s\n", lua_tostring(L, -1));
+        } else {
+            if (lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK) {
+                Serial.printf("Exec Error: %s\n", lua_tostring(L, -1));
+            }
+        }
     }
 
-    size_t len = file.size();
-    char* buf = new char[len + 1];
-    file.readBytes(buf, len);
-    buf[len] = 0;
-    file.close();
-
-    if (luaL_loadbuffer(L, buf, len, fixedPath) || lua_pcall(L, 0, 0, 0)) {
-        panic(PANIC_LUA_ERROR, lua_tostring(L, -1));
-    }
-
-    lua_close(L);
-    delete[] buf;
-
+    portENTER_CRITICAL(&btnMux);
+    btnUp_Event = BTN_NONE;
+    btnDown_Event = BTN_NONE;
+    btnOK_Event = BTN_NONE;
+    btnAction_Event = BTN_NONE;
+    portEXIT_CRITICAL(&btnMux);
     luaRunning = false;
+
+    delay(100);
 }

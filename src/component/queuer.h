@@ -39,4 +39,23 @@ inline void initBackgroundManager() {
     for (int i = 0; i < MAX_WORKERS; i++) {
         xTaskCreate(workerTask, "Worker", WORKER_STACK, nullptr, 1, nullptr);
     }
+
+    xTaskCreate([](void* args) {
+        for (;;) {
+            if (Serial.available()) {
+                String cmd = Serial.readStringUntil('\n');
+                cmd.trim();
+
+                if (cmd == "PING") {
+                    Serial.println("PONG");
+                } else if (cmd == "REBOOT") {
+                    Serial.println("Rebooting via software...");
+                    delay(500);
+                    esp_restart();
+                }
+            }
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
+    },
+                "SerialRecovery", 2048, nullptr, 1, nullptr);
 }

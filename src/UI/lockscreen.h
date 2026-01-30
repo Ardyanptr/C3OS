@@ -8,176 +8,289 @@
 extern void appHeartBeat();
 extern bool systemUIActive;
 
+extern uint32_t SLEEP_TIMEOUT;
+
+static float flyOffset = 0.0f;
+static bool lastTimerState = false;
+
 inline void displayAOD() {
     display.clearBuffer();
-
     display.setFontMode(1);
     display.setBitmapMode(1);
 
+    uint32_t now = millis();
+    bool isRunning = timerIsRunning();
+
+    if (lastTimerState == true && isRunning == false) {
+        flyOffset = 1;
+    }
+
+    lastTimerState = isRunning;
+
     display.drawXBM(1, 1, 57, 9, image_wondrlan_bits);
 
-    if (timerIsRunning()) {
+    if (isRunning || flyOffset > 0) {
+        int yShift = 0;
+
+        if (!isRunning && flyOffset > 0) {
+            flyOffset += flyOffset * 0.15f;
+
+            yShift = -(int)flyOffset;
+
+            if (yShift < -70) {
+                flyOffset = 0;
+            }
+        }
+
         uint32_t t = timerGetRemain();
         uint8_t h = t / 3600;
         uint8_t m = (t % 3600) / 60;
         uint8_t s = t % 60;
 
-        char buf[10];
+        char buf[20];
         sprintf(buf, "%02d:%02d:%02d", h, m, s);
 
-        display.drawRFrame(3, 12, 123, 22, 3);
-        display.drawXBM(7, 16, 7, 7, image_Pin_star_bits);
+        display.drawRFrame(3, 12 + yShift, 123, 22, 3);
+        display.drawXBM(7, 16 + yShift, 7, 7, image_Pin_star_bits);
+
         display.setFont(u8g2_font_5x8_tr);
-        display.drawStr(16, 23, "Timer");
+        display.drawStr(16, 23 + yShift, "Timer");
+        display.drawStr(41, 23 + yShift, buf);
 
-        display.drawStr(41, 23, "|");
-
-        display.drawStr(48, 23, buf);
-
-        display.drawLine(6, 28, 122, 28);
-        display.drawLine(6, 26, 6, 30);
-        display.drawLine(122, 26, 122, 30);
+        display.drawLine(6, 28 + yShift, 122, 28 + yShift);
+        display.drawLine(6, 26 + yShift, 6, 30 + yShift);
+        display.drawLine(122, 26 + yShift, 122, 30 + yShift);
 
         uint32_t total = timerGetTotal();
+
         if (total > 0) {
             int progressWidth = (t * 116) / total;
-            display.drawBox(6, 27, progressWidth, 3);
+
+            display.drawBox(6, 27 + yShift, progressWidth, 3);
         }
     }
 
+    Serial.println("[AOD/DISP] Consumer[0] Updating OLED");
     display.sendBuffer();
 }
 
 inline void startAOD() {
-    setCpuFrequencyMhz(80);
-    uint8_t pin = BUTTON_OK;
+    Serial.println("[AOD] Entering AOD");
 
-    pinMode(pin, INPUT_PULLUP);
-    digitalWrite(pin, HIGH);
-
+    display.setPowerSave(0);
     display.setContrast(1);
-    displayAOD();
+
+    display.setFontMode(1);
+    display.setBitmapMode(1);
+
+    display.clearBuffer();
+    display.drawBox(0, 0, 128, 64);
+    display.sendBuffer();
+
+    display.clearBuffer();
+    display.setFont(u8g2_font_6x10_tr);
+    display.drawStr(20, 32, "AOD READY");
+    display.sendBuffer();
+
+    Serial.println("[AOD] Display sanity check done");
+
+    uint8_t pin = Settings::instance->get().aodPin;
+    pinMode(pin, INPUT_PULLUP);
+
+    uint32_t settleStart = millis();
+    while (digitalRead(pin) == LOW && millis() - settleStart < 500) {
+        yield();
+        delay(1);
+    }
+
+    uint32_t btnPressedAt = 0;
+    bool lastBtn = HIGH;
+
+    flyOffset = 0;
+    lastTimerState = false;
 
     uint32_t lastTick = millis();
-    uint32_t lastDisplayUpdate = millis();
-
-    while (digitalRead(pin) == LOW) {
-        appHeartBeat();
-        delay(10);
-    }
+    uint32_t lastDisplayUpdate = 0;
 
     while (true) {
         appHeartBeat();
+
         uint32_t now = millis();
+        bool btn = digitalRead(pin);
+
+        static uint32_t lastLog = 0;
+        if (now - lastLog > 200) {
+            Serial.printf("BTN=%d\n", btn);
+            lastLog = now;
+        }
+
+        if (lastBtn == HIGH && btn == LOW) {
+            btnPressedAt = now;
+        }
+
+        if (btn == LOW && btnPressedAt && now - btnPressedAt > 200) {
+            Serial.println("[AOD] Exit");
+            break;
+        }
+
+        if (btn == HIGH) {
+            btnPressedAt = 0;
+        }
+
+        lastBtn = btn;
 
         if (now - lastTick >= 1000) {
             timerTick();
-            lastTick += 1000;
+            lastTick = now;
         }
 
-        if (now - lastDisplayUpdate >= 1000) {
+        uint32_t refresh = (flyOffset > 0) ? 33 : 500;
+        if (now - lastDisplayUpdate >= refresh) {
             displayAOD();
             lastDisplayUpdate = now;
         }
 
-        if (digitalRead(pin) == LOW) {
-            break;
-        }
-
-        delay(50);
+        vTaskDelay(1);
     }
 
-    while (digitalRead(pin) == LOW) {
-        delay(10);
-    }
-
-    setCpuFrequencyMhz(160);
     display.setContrast(Settings::instance->get().oledContrast);
 }
 
+static const unsigned char image_user_bits[] = {
+    0xe0, 0x00, 0x10, 0x01, 0x08, 0x02, 0x08, 0x02, 0x08, 0x02, 0x10, 0x01, 0xe0, 0x00,
+    0x00, 0x00, 0xf0, 0x01, 0x0c, 0x06, 0x02, 0x08, 0x02, 0x08, 0x01, 0x10, 0x01, 0x10,
+    0x01, 0x10, 0xff, 0x1f};
+
 inline void showLockscreen(bool isWake) {
+    uint8_t pin = Settings::instance->get().aodPin;
+
+    if (SLEEP_TIMEOUT != Settings::instance->get().sleepTimeout) {
+        SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+
+        display.clearBuffer();
+        display.setBitmapMode(1);
+        display.drawRFrame(20, 13, 89, 38, 3);
+
+        display.drawXBM(24, 17, 9, 8, image_Alert_bits);
+
+        display.setFont(u8g2_font_4x6_tr);
+        display.drawStr(36, 24, "Setting Warning");
+        display.drawStr(24, 33, "Error: Trying to set");
+        display.drawStr(24, 41, "Sleep Timeout!");
+
+        display.sendBuffer();
+        delay(2500);
+    }
+
+    if (pin != 1 && pin != 2 && pin != 3 && pin != 4) {
+        LittleFS.begin(true);
+        display.clearBuffer();
+        display.setBitmapMode(1);
+        display.drawRFrame(20, 13, 89, 38, 3);
+
+        display.drawXBM(24, 17, 9, 8, image_Alert_bits);
+
+        display.setFont(u8g2_font_4x6_tr);
+        display.drawStr(36, 24, "Setting Warning");
+        display.drawStr(24, 33, "Error: AOD PIN Error");
+        display.drawStr(24, 41, "AOD Failure!");
+
+        display.sendBuffer();
+        delay(2500);
+    }
+
     systemUIActive = true;
     const uint8_t CODE_LEN = 4;
     const uint8_t secret[CODE_LEN] = {0, 0, 0, 0};
     uint8_t input[CODE_LEN] = {0, 0, 0, 0};
     uint8_t idx = 0;
     uint8_t curVal = 0;
-    unsigned long lastAnim = 0;
-    uint8_t phase = 0;
+
     unsigned long lockStart = millis();
     const unsigned long LOCK_TIMEOUT = 10000;
 
-    auto draw = [&](bool flashError) {
-        display.clearBuffer();
+    float boxWidth = 40.0;
+    float curBoxWidth = 40.0;
+    float iconY = 13.0;
+    float curIconY = 13.0;
 
-        display.drawVLine(0, 0, 10);
-        display.drawHLine(0, 0, 10);
-        display.drawVLine(127, 0, 10);
-        display.drawHLine(117, 0, 10);
-        display.drawVLine(0, 54, 10);
-        display.drawHLine(0, 63, 10);
-        display.drawVLine(127, 54, 10);
-        display.drawHLine(117, 63, 10);
-
-        display.setFont(u8g2_font_4x6_tf);
-        if (flashError) {
-            display.setFont(u8g2_font_profont12_tr);
-            display.drawStr(28, 16, "Wrong Code!");
-        } else {
-            display.setFont(u8g2_font_profont12_tr);
-            display.drawStr(34, 16, "Enter Code");
-        }
-
-        int centerX = 64;
-        int spacing = 18;
-        int startX = centerX - ((CODE_LEN - 1) * spacing) / 2;
-
-        for (uint8_t i = 0; i < CODE_LEN; ++i) {
-            int x = startX + i * spacing;
-
-            if (i < idx) {
-                display.drawDisc(x, 42, 3);
-            } else if (i == idx) {
-                char ch[2] = {(char)('0' + curVal), 0};
-                display.setFont(u8g2_font_logisoso16_tn);
-                int w = display.getStrWidth(ch);
-                display.drawStr(x - (w / 2), 48, ch);
-
-                display.drawHLine(x - 6, 52, 12);
-                display.drawHLine(x - 4, 53, 8);
-            } else {
-                display.drawCircle(x, 42, 2);
-            }
-        }
-
-        display.sendBuffer();
-    };
+    bool isShaking = false;
+    unsigned long shakeStart = 0;
 
     bool upWasLow = (digitalRead(BUTTON_UP) == LOW);
     bool downWasLow = (digitalRead(BUTTON_DOWN) == LOW);
     bool okWasLow = (digitalRead(BUTTON_OK) == LOW);
     bool actWasLow = (digitalRead(BUTTON_ACTION) == LOW);
 
-    draw(false);
-
     while (true) {
         appHeartBeat();
         timerTick();
-
         unsigned long now = millis();
 
         if (now - lockStart > LOCK_TIMEOUT) {
             startAOD();
-
             lockStart = millis();
             idx = 0;
             curVal = 0;
 
-            upWasLow = (digitalRead(BUTTON_UP) == LOW);
-            downWasLow = (digitalRead(BUTTON_DOWN) == LOW);
-            okWasLow = (digitalRead(BUTTON_OK) == LOW);
-            actWasLow = (digitalRead(BUTTON_ACTION) == LOW);
-            draw(false);
+            curBoxWidth = 40.0;
+            curIconY = 13.0;
+            continue;
+        }
+
+        curBoxWidth += (boxWidth - curBoxWidth) * 0.3;
+        curIconY += (iconY - curIconY) * 0.2;
+
+        int offsetX = 0;
+        if (isShaking) {
+            if (now - shakeStart < 400) {
+                offsetX = (int)(sin((now - shakeStart) * 0.05) * 4);
+            } else {
+                isShaking = false;
+                idx = 0;
+                curVal = 0;
+            }
+        }
+
+        display.clearBuffer();
+        display.setBitmapMode(1);
+
+        display.setDrawColor(1);
+        display.drawXBM(58 + offsetX, (int)curIconY, 13, 16, image_user_bits);
+
+        int drawW = (int)curBoxWidth;
+        int drawX = 64 - (drawW / 2) + offsetX;
+        int drawY = 39;
+
+        display.drawRBox(drawX, drawY, drawW, 10, 4);
+
+        display.setFont(u8g2_font_5x8_tf);
+        display.setDrawColor(0);
+
+        String passStr = "";
+        int strWidthTotal = 0;
+
+        for (int i = 0; i < CODE_LEN; i++) {
+            if (i < idx)
+                passStr += "* ";
+            else if (i == idx) {
+                passStr += String(curVal);
+                passStr += " ";
+            } else
+                passStr += "- ";
+        }
+
+        passStr.trim();
+
+        int strW = display.getStrWidth(passStr.c_str());
+
+        display.drawStr(64 - (strW / 2) + offsetX, 47, passStr.c_str());
+
+        display.setDrawColor(1);
+        display.sendBuffer();
+
+        if (isShaking) {
+            delay(15);
             continue;
         }
 
@@ -185,20 +298,21 @@ inline void showLockscreen(bool isWake) {
         int dnL = digitalRead(BUTTON_DOWN);
         int okL = digitalRead(BUTTON_OK);
         int acL = digitalRead(BUTTON_ACTION);
-
         bool changed = false;
 
         if (upL == LOW && !upWasLow) {
             curVal = (curVal + 1) % 10;
+            curBoxWidth = 52.0;
+            curIconY = 11.0;
             changed = true;
-            lockStart = now;
         }
         upWasLow = (upL == LOW);
 
         if (dnL == LOW && !downWasLow) {
             curVal = (curVal + 9) % 10;
+            curBoxWidth = 52.0;
+            curIconY = 15.0;
             changed = true;
-            lockStart = now;
         }
         downWasLow = (dnL == LOW);
 
@@ -206,16 +320,19 @@ inline void showLockscreen(bool isWake) {
             if (idx > 0) {
                 idx--;
                 curVal = input[idx];
+                curBoxWidth = 30.0;
             }
             changed = true;
-            lockStart = now;
         }
         actWasLow = (acL == LOW);
 
         if (okL == LOW && !okWasLow) {
             input[idx] = curVal;
             idx++;
-            lockStart = now;
+
+            curBoxWidth = 58.0;
+            changed = true;
+
             if (idx >= CODE_LEN) {
                 bool ok = true;
                 for (uint8_t i = 0; i < CODE_LEN; ++i)
@@ -224,28 +341,17 @@ inline void showLockscreen(bool isWake) {
                 if (ok) {
                     break;
                 } else {
-                    idx = 0;
-                    curVal = 0;
-                    draw(true);
-                    delay(1000);
-                    changed = true;
+                    isShaking = true;
+                    shakeStart = millis();
                 }
             } else {
                 curVal = 0;
-                changed = true;
             }
         }
         okWasLow = (okL == LOW);
 
-        if (changed || (now - lastAnim > 120)) {
-            if (now - lastAnim > 120) {
-                phase++;
-                lastAnim = now;
-            }
-            draw(false);
-        }
-
-        delay(20);
+        if (changed) lockStart = now;
+        delay(15);
     }
 
     lastActive = millis();
