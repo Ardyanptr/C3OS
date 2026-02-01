@@ -34,7 +34,7 @@ inline void eme_restart_run() {
 
     display.drawStr(8, 30, "- Turning Off Service...");
     display.sendBuffer();
-    
+
     stopAllService();
 
     display.drawStr(8, 37, "- Unloading Components");
@@ -47,6 +47,16 @@ inline void eme_restart_run() {
     display.sendBuffer();
 
     display.drawStr(4, 58, "Wait. May take a while!");
+
+    display.clearBuffer();
+
+    display.drawRFrame(24, 26, 80, 14, 3);
+
+    display.setFont(u8g2_font_6x10_tr);
+    display.drawStr(28, 36, "Keep Holding");
+
+    delay(1000);
+
     display.sendBuffer();
 
     sendCommand("32:start");

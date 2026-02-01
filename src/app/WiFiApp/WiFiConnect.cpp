@@ -9,12 +9,16 @@ const int WC_TEXT_OFFSET = 13;
 const int WC_START_Y = 18;
 
 // Menu State
-int wifiMenuIndex = 0;
 #define MAX_SAVED 2
+
+int wifiMenuIndex = 0;
+
 String savedSSIDs[MAX_SAVED] = {"_ARDASYAH", "ardyan"};
 String savedPass[MAX_SAVED] = {"Satunusasatubangsa", "ardyann"};
 
 String ssid, pass;
+
+bool isWiFiConnectRunning = true;
 
 // --- UTILITY UI ---
 
@@ -187,13 +191,32 @@ void onOK_WC() {
 
 // --- EXTERNAL FUNCTION ---
 
+void WiFiConnect_Exit() {
+}
+
 void startWiFiConnect() {
     wifiMenuIndex = 0;
+    isWiFiConnectRunning = true;
+
     detachCallback();
     drawWiFiConnectUI();
 
     btnUp.attachClick(onUpClick_WC);
     btnDown.attachClick(onDownClick_WC);
     btnOK.attachClick(onOK_WC);
-    btnOK.attachLongPressStart(drawMenu);
+    btnOK.attachLongPressStart([]() {
+        isWiFiConnectRunning = false;
+    });
+
+    while (isWiFiConnectRunning) {
+        btnUp.tick();
+        btnDown.tick();
+        btnOK.tick();
+
+        drawWiFiConnectUI();
+        vTaskDelay(5 / portTICK_PERIOD_MS);
+    }
+
+    drawMenu();
+    return;
 }
