@@ -31,6 +31,7 @@ extern void runTelnet();
 extern void runFileManager();
 extern void runStore();
 extern void runTimerApp();
+extern void proceedUpdate();
 
 extern void non_set();
 
@@ -64,7 +65,8 @@ extern void non_set();
     X(runGameClient_DOOM)      \
     X(runFileManager)          \
     X(runStore)                \
-    X(runTimerApp)
+    X(runTimerApp)             \
+    X(proceedUpdate)
 
 #define X(name) {#name, name, 0, 20 * 1024, true},
 AppDesc appTable[] = {

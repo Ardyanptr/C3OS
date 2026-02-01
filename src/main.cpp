@@ -12,6 +12,7 @@
 #include "include/UILib.h"
 #include "include/WiFiAppLib.h"
 #include "system16/loader.h"
+#include "system16/update.h"
 
 String BOARD_ATTACHED = "ESP32-C3";
 int BOARD_REV = 4;
@@ -154,7 +155,7 @@ const char* menuItems[] = {
     "Keyboard Cat", "WiFi Storm", "Echo Sniffer", "IR Blaster", "Flappy Bird",
     "Factory Reset", "Check System Integrity", "Online Story", "Heap Monitor",
     "Stopwatch", "BenchMyESP", "Minecraft", "Stardew Valley", "BLE Scan", "C3 Burner",
-    "WiFi Telnet", "Doom GL", "File Manager", "Store Manager", "Timer"};
+    "WiFi Telnet", "Doom GL", "File Manager", "Store Manager", "Timer", "Update"};
 
 const int menuCount = sizeof(menuItems) / sizeof(menuItems[0]);
 const int visibleItem = sysConfig.visible_items;
