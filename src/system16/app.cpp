@@ -16,8 +16,7 @@ extern void runWiFiStorm();
 extern void runEchoSniffer();
 extern void startIRCopy();
 extern void runFlappyBird();
-extern void factory_reset_run();
-extern void check_sys_integrity_run();
+extern void check_sys_integrity();
 extern void runOnlineStory();
 extern void runHeapMonitor();
 extern void runStopwatch();
@@ -53,8 +52,8 @@ extern void non_set();
     X(runEchoSniffer)          \
     X(startIRCopy)             \
     X(runFlappyBird)           \
-    X(factory_reset_run)       \
-    X(check_sys_integrity_run) \
+    X(non_set)                 \
+    X(check_sys_integrity)     \
     X(runOnlineStory)          \
     X(runHeapMonitor)          \
     X(runStopwatch)            \

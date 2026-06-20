@@ -33,6 +33,7 @@
 #include "esp_vfs_dev.h"
 #include "driver/uart.h"
 
+// OS Variables and Stuffs
 volatile uint32_t last_heartbeat = 0;
 hw_timer_t* watchdog_timer = NULL;
 
@@ -57,32 +58,11 @@ void IRAM_ATTR watchdog_isr() {
     }
 }
 
-String BOARD_ATTACHED = "ESP32-C3";
+// Board Info
+String BOARD_ATTACHED = "ESP32-C3"; // fixed
 int BOARD_REV = 4;
 
-void runGameClient_SWT() {
-    GameClient* client = new GameClient(BUTTON_UP, BUTTON_DOWN, BUTTON_ACTION, BUTTON_OK);
-
-    client->begin();
-    client->runGame();
-
-    delete client;
-}
-
-void runGameClient_SVC() {
-    GameClient_svc client(BUTTON_UP, BUTTON_DOWN, BUTTON_ACTION, BUTTON_OK);
-
-    client.begin();
-    client.runGame();
-}
-
-void runGameClient_DOOM() {
-    GameClient_Doom client(BUTTON_UP, BUTTON_DOWN, BUTTON_OK, BUTTON_ACTION);
-
-    client.begin();
-    client.runGame();
-}
-
+// Start of Initializer
 C3OSDisplay display(U8G2_R0, U8X8_PIN_NONE);
 
 OneButton btnUp(BUTTON_UP, true);
@@ -95,6 +75,7 @@ AT24C256 eep;
 Settings setting;
 PowerManager gPower;
 DFRobot_VL53L0X sensor;
+// End of Initializer
 
 uint32_t appLastBeat = 0;
 uint8_t anrSelect = 0;
@@ -153,8 +134,6 @@ void runSettings() {
     setting.run();
 }
 
-void factory_reset_run() {}
-
 void check_sys_integrity_run() { check_sys_integrity(); }
 
 void non_set() {}
@@ -193,9 +172,6 @@ void enable_pm() {
     esp_pm_configure(&pm);
 }
 
-void showFinalErrorScreen();
-void showSuccessScreen();
-
 unsigned long lastActive = 0;
 static unsigned long lastTick = 0;
 bool isOnSleepMode = false;
@@ -230,8 +206,35 @@ bool isEjected = false;
 String notificationText = "";
 int lastSelectedIndex = -1;
 
-void initMenuButton();
 void IRAM_ATTR onButton() { lastActive = millis(); }
+
+void initMenuButton();
+void showFinalErrorScreen();
+void showSuccessScreen();
+
+// Game engine
+void runGameClient_SWT() {
+    GameClient* client = new GameClient(BUTTON_UP, BUTTON_DOWN, BUTTON_ACTION, BUTTON_OK);
+
+    client->begin();
+    client->runGame();
+
+    delete client;
+}
+
+void runGameClient_SVC() {
+    GameClient_svc client(BUTTON_UP, BUTTON_DOWN, BUTTON_ACTION, BUTTON_OK);
+
+    client.begin();
+    client.runGame();
+}
+
+void runGameClient_DOOM() {
+    GameClient_Doom client(BUTTON_UP, BUTTON_DOWN, BUTTON_OK, BUTTON_ACTION);
+
+    client.begin();
+    client.runGame();
+}
 
 void showShortcutGUI() {
     display.clearBuffer();
@@ -285,6 +288,47 @@ void showShortcutGUI() {
     });
 }
 
+void syncESP8266() {
+    display.clearBuffer();
+
+    draw_restartESP8266();
+    setupESP8266Communication();
+    esp_task_wdt_reset();
+
+    sendCommand("32:start");
+    delay(100);
+    esp_task_wdt_reset();
+
+    sendCommand("avr32:force-restart");
+    delay(100);
+    esp_task_wdt_reset();
+
+    display.clearBuffer();
+    display.setFontMode(1);
+    display.setBitmapMode(1);
+
+    display.drawXBM(29, 28, 7, 8, image_Rpc_active_bits);
+
+    display.setFont(u8g2_font_5x7_tr);
+    display.drawStr(41, 35, "Restarting MCU");
+    display.sendBuffer();
+
+    setupESP8266Communication();
+    esp_task_wdt_reset();
+
+    sendCommand("32:start");
+    delay(100);
+    esp_task_wdt_reset();
+
+    sendCommand("avr32:test");
+    esp_task_wdt_reset();
+
+    delay(500);
+    esp_task_wdt_reset();
+
+    drawMenu();
+}
+
 void showActionGUI() {
     display.clearBuffer();
     display.sendBuffer();
@@ -302,56 +346,9 @@ void showActionGUI() {
     display.drawStr(49, 46, "Back");
     display.sendBuffer();
 
-    btnAction.attachClick([]() { shutdown_now(); });
-
-    btnAction.attachDoubleClick([]() { restart_now(); });
-
-    btnAction.attachMultiClick([]() {
-        boot_mode = BOOT_NORMAL;
-
-        display.clearBuffer();
-
-        esp_task_wdt_reset();
-
-        draw_restartESP8266();
-        setupESP8266Communication();
-        esp_task_wdt_reset();
-
-        sendCommand("32:start");
-        delay(100);
-        esp_task_wdt_reset();
-
-        sendCommand("avr32:force-restart");
-        delay(100);
-        esp_task_wdt_reset();
-
-        display.clearBuffer();
-        display.setFontMode(1);
-        display.setBitmapMode(1);
-
-        display.drawXBM(29, 28, 7, 8, image_Rpc_active_bits);
-
-        display.setFont(u8g2_font_5x7_tr);
-        display.drawStr(41, 35, "Restarting MCU");
-        display.sendBuffer();
-
-        esp_task_wdt_reset();
-
-        setupESP8266Communication();
-        esp_task_wdt_reset();
-
-        sendCommand("32:start");
-        delay(100);
-        esp_task_wdt_reset();
-
-        sendCommand("avr32:test");
-        esp_task_wdt_reset();
-
-        delay(500);
-        esp_task_wdt_reset();
-
-        drawMenu();
-    });
+    btnAction.attachClick(shutdown_now);
+    btnAction.attachDoubleClick(restart_now);
+    btnAction.attachMultiClick(syncESP8266);
 
     btnAction.attachLongPressStart([]() {
         powerNotifyActivity();
@@ -379,23 +376,14 @@ void drawMenuItemsWithOffset(float scrollOffset) {
 
     float targetBoxY = (menuIndex - scrollOffset) * ITEM_HEIGHT;
 
-    // Add offset for status bar and entrance animation
     int UI_OFFSET_Y = 10 + (int)menuYOffset;
 
-    if (!isScrolling) {
-        currentBoxY = targetBoxY;
-    } else {
-        // Bouncy box movement
-        currentBoxY += (targetBoxY - currentBoxY) * 0.4f;
-    }
+    !isScrolling ? currentBoxY = targetBoxY : currentBoxY += (targetBoxY - currentBoxY) * 0.4f;
 
     display.setDrawColor(1);
     display.drawRBox(0, (int)currentBoxY + UI_OFFSET_Y, 128, ITEM_HEIGHT, 3);
 
-    // Pulse effect on selection box
-    if (systemUIActive) {
-        Liveness::Effects::drawFocusPulse(display, (int)currentBoxY + UI_OFFSET_Y, ITEM_HEIGHT);
-    }
+    if (systemUIActive) Liveness::Effects::drawFocusPulse(display, (int)currentBoxY + UI_OFFSET_Y, ITEM_HEIGHT);
 
     const int baseTextX = 4;
 
@@ -416,6 +404,7 @@ void drawMenuItemsWithOffset(float scrollOffset) {
 }
 
 bool skipButtonInit = false;
+
 void drawMenu() {
     appRunning = false;
     currentApp = -1;
@@ -431,14 +420,8 @@ void drawMenu() {
     display.setFont(u8g2_font_7x14_tr);
     display.clearBuffer();
 
-    // Draw ambient background
-    if (systemUIActive) {
-        Liveness::Ambient::updateAndDraw(display);
-    }
-
-    if (!skipButtonInit) {
-        initMenuButton();
-    }
+    if (systemUIActive) Liveness::Ambient::updateAndDraw(display);
+    if (!skipButtonInit) initMenuButton();
 
     float currentOffset;
     if (isScrolling) {
@@ -461,7 +444,6 @@ void drawMenu() {
 
     drawMenuItemsWithOffset(currentOffset);
 
-    // Draw status bar and notifications
     if (systemUIActive) {
         Liveness::StatusBar::draw(display);
         Liveness::Notifications::draw(display);
@@ -507,7 +489,6 @@ void updateScroll() {
 }
 
 static void animateLaunch(const char* name) {
-    // Fade out menu
     for (int i = Settings::instance->get().oledContrast; i >= 0; i -= 15) {
         display.setContrast(i);
         delay(10);
@@ -516,19 +497,20 @@ static void animateLaunch(const char* name) {
 
     display.clearBuffer();
     display.setFont(u8g2_font_7x14_tr);
+
     int width = display.getStrWidth(name);
+
     display.drawStr((128 - width) / 2, 35, name);
     display.sendBuffer();
 
-    // Fade in app name
     for (int i = 0; i <= Settings::instance->get().oledContrast; i += 15) {
         display.setContrast(i);
         delay(10);
         esp_task_wdt_reset();
     }
+
     delay(300);
 
-    // Fade out app name before starting app
     for (int i = Settings::instance->get().oledContrast; i >= 0; i -= 15) {
         display.setContrast(i);
         delay(10);
@@ -537,7 +519,6 @@ static void animateLaunch(const char* name) {
 }
 
 static void animateExit(const char* name) {
-    // Fade out app content
     for (int i = Settings::instance->get().oledContrast; i >= 0; i -= 15) {
         display.setContrast(i);
         delay(10);
@@ -551,10 +532,7 @@ void runApp(int index) {
     AppDesc& app = appTable[index];
     if (ESP.getFreeHeap() < app.minHeap) return;
 
-    // Save state as dirty before launching
     StateManager::saveState(menuIndex, index, true);
-
-    // launch animation
     animateLaunch(app.name);
 
     Liveness::Notifications::show("Launching: " + String(app.name));
@@ -571,19 +549,17 @@ void runApp(int index) {
     appRunning = true;
     currentApp = index;
 
-    // Wait while app is in foreground
     while (ProcessManager::instance().getForegroundId() == pid) {
         btnUp.tick();
         btnDown.tick();
         btnOK.tick();
         btnAction.tick();
         
-        // Handle global backgrounding (Long press Action)
         if (digitalRead(BUTTON_ACTION) == LOW) {
             unsigned long start = millis();
             while(digitalRead(BUTTON_ACTION) == LOW) {
                 if (millis() - start > 1000) {
-                    ProcessManager::instance().setForeground(-1); // Go to home
+                    ProcessManager::instance().setForeground(-1);
                     break;
                 }
                 delay(10);
@@ -599,12 +575,9 @@ void runApp(int index) {
     appRunning = false;
     currentApp = -1;
 
-    // exit animation
     animateExit(app.name);
-    
     Liveness::Notifications::show("App Backgrounded");
 
-    // Save state as clean after app exit
     StateManager::saveState(menuIndex, -1, false);
 
     menuEntranceRequested = true;
@@ -613,24 +586,17 @@ void runApp(int index) {
 
 void handleLongPressScroll() {
     esp_task_wdt_reset();
+    unsigned long now = millis();
 
     if (!longPressUpActive && !longPressDownActive) return;
-
-    unsigned long now = millis();
     if (now - longPressScrollLast < (unsigned long)longPRessScrollInterval) return;
 
     longPressScrollLast = now;
     longPressScrollCount++;
 
-    if (longPressScrollCount % 5 == 0) {
-        longPRessScrollInterval = max(40, longPRessScrollInterval - 20);
-    }
-
-    if (longPressUpActive) {
-        menuIndex = (menuIndex - 1 + menuCount) % menuCount;
-    } else {
-        menuIndex = (menuIndex + 1) % menuCount;
-    }
+    if (longPressScrollCount % 5 == 0) longPRessScrollInterval = max(40, longPRessScrollInterval - 20);
+        
+    longPressUpActive ? menuIndex = (menuIndex - 1 + menuCount) % menuCount : menuIndex = (menuIndex + 1) % menuCount; 
 
     updateScroll();
     drawMenu();
@@ -694,7 +660,6 @@ void initMenuButton() {
         lastActive = millis();
         gPower.notifyActivity();
         
-        // Wait for button release to prevent accidental trigger
         while(digitalRead(BUTTON_ACTION) == LOW) { delay(10); esp_task_wdt_reset(); }
         
         showActionGUI();
@@ -705,7 +670,6 @@ void initMenuButton() {
         lastActive = millis();
         gPower.notifyActivity();
         
-        // Show Task Manager
         showTaskManager();
         
         initMenuButton();
@@ -763,17 +727,11 @@ void setup() {
 
     extern void runCrashManager();
     CrashEngine::begin();
-    
-    // Initialize Security Kernel for corruption detection and recovery
     SecurityKernel::begin();
     
-    if (CrashEngine::shouldEnterSafeMode()) {
-        runCrashManager();
-    }
+    if (CrashEngine::shouldEnterSafeMode()) runCrashManager();
 
-    if (crash_magic == CRASH_MAGIC_PENDING) {
-        handle_crash_recovery();
-    }
+    if (crash_magic == CRASH_MAGIC_PENDING) handle_crash_recovery();
 
     crash_magic = 0;
 
@@ -781,8 +739,7 @@ void setup() {
 
     esp_err_t wdt_err = esp_task_wdt_add(NULL);
     if (wdt_err != ESP_OK && wdt_err != ESP_ERR_INVALID_ARG) {
-        // ESP_ERR_INVALID_ARG means task already subscribed — that's fine
-        Serial.printf("[WDT] Warning: esp_task_wdt_add returned 0x%x\n", wdt_err);
+        Serial.printf("[WDT] Warning: esp_task_wdt_add returned 0x%x\n", wdt_err); // ESP_ERR_INVALID_ARG means task already subscribed — that's fine
     }
     esp_task_wdt_reset();
 
@@ -801,11 +758,9 @@ void setup() {
         case BL_BOOT_DFU:
             break;
         case BL_BOOT_RCPM: {
-            // Pastikan Serial dan OLED kamu sudah di-.begin() di setup utama
             Serial.println("\n\nStarting C3-DOS...");
             delay(500);
 
-            // Tampilan Booting ala DOS di OLED
             display.clearBuffer();
             display.setFont(u8g2_font_6x10_tf);
             display.drawStr(0, 10, "C3-DOS Version 1.0");
@@ -989,9 +944,8 @@ void loop() {
     if (isScrolling || abs(menuYOffset) > 0.1f) {
         drawMenu();
     } else if (!appRunning && systemUIActive) {
-        // Idle animation update
         static unsigned long lastLivenessUpdate = 0;
-        if (now - lastLivenessUpdate > 50) { // 20 FPS
+        if (now - lastLivenessUpdate > 50) {
             skipButtonInit = true;
             drawMenu();
             skipButtonInit = false;
