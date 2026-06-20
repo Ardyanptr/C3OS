@@ -1,0 +1,12 @@
+{
+    "ui": {
+        "scroll_duration": 300,
+        "visible_items": 6,
+        "text_offset_y": 12,
+        "draw_count": 5
+    },
+    "system": {
+        "anr_active": false,
+        "system_ui_active": true
+    }
+}

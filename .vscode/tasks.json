@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Upload Pico",
+            "type": "shell",
+            "command": "platformio run -e pico -t upload"
+        },
+        {
+            "label": "Upload ESP32",
+            "type": "shell",
+            "command": "platformio run -e esp32-c3-devkitc-02 -t upload"
+        }
+    ]
+}

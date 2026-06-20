@@ -1,0 +1,8 @@
+{
+    "gravity": 48.0,
+    "jump_force": -18.0,
+    "move_speed": 14.0,
+    "biome": "forest",
+    "spwan_mobs": true,
+    "world_height": 64
+}

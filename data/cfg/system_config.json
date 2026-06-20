@@ -1,0 +1,15 @@
+{
+    "boot": {
+        "init_tof": true,
+        "init_eeprom": true,
+        "init_service": true,
+        "ignore_hardware": false,
+        "no_init": false
+    },
+    "user_pin": {
+        "pin1": 0,
+        "pin2": 0,
+        "pin3": 0,
+        "pin4": 0
+    }
+}

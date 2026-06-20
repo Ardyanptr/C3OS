@@ -1,0 +1,5 @@
+{
+    "current_os_version": "/cfg/update.json",
+    "check_esp8266": true,
+    "auto_sync": true
+}

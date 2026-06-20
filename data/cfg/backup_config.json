@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "description": "Critical settings backup configuration for C3OS Security Kernel",
+  "auto_backup_enabled": true,
+  "backup_interval_ms": 60000,
+  "max_backup_count": 5,
+  "critical_files": [
+    "/settings.bin",
+    "/cfg/system_config.json",
+    "/cfg/ui_layout.json",
+    "/cfg/user_prefs.lua",
+    "/cfg/crash_config.json"
+  ],
+  "recovery_options": {
+    "auto_recover_on_corruption": true,
+    "format_on_fs_error": true,
+    "preserve_user_data": true
+  },
+  "security_settings": {
+    "integrity_check_on_boot": true,
+    "watchdog_enabled": true,
+    "watchdog_timeout_ms": 10000
+  }
+}
