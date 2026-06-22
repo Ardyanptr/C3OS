@@ -567,6 +567,17 @@ void runApp(int index) {
             }
         }
 
+        if (!appRunning) {
+            static unsigned long lastMenuAnim = 0;
+            unsigned long nowMs = millis();
+            if (nowMs - lastMenuAnim > 50) {
+                skipButtonInit = true;
+                drawMenu();
+                skipButtonInit = false;
+                lastMenuAnim = nowMs;
+            }
+        }
+
         vTaskDelay(pdMS_TO_TICKS(10));
         esp_task_wdt_reset();
         last_heartbeat = millis();

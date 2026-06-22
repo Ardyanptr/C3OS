@@ -1,6 +1,7 @@
 #include "BenchMyESP.h"
 #include <Arduino.h>
 #include "esp_task_wdt.h"
+#include "system16/esp826.h"
 
 // --- C3-TITAN "ULTIMATE" Config ---
 #define MAX_ITER 1024          // Professional depth
@@ -25,10 +26,13 @@ void renderC3Titan() {
     uint32_t renderStart = millis();
     totalIterations = 0;
     int bucketCount = 0;
+
+    sendCommand("avr32:bench-start");
+    Serial.println("[TITAN] ESP8266 Co-processor benchmark started!");
     
     display.clearBuffer();
     display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(2, 8, "TITAN ENGINE - SSAA 2x2 / 1024i");
+    display.drawStr(2, 8, "TITAN ENGINE - C3+ESP8266");
     display.drawHLine(0, 10, 128);
     display.sendBuffer();
 
@@ -94,13 +98,16 @@ void renderC3Titan() {
     
     uint32_t renderTime = millis() - renderStart;
     Serial.printf("[TITAN] Render Complete in %ums\n", (unsigned int)renderTime);
-    Serial.printf("[TITAN] Total Calculations: %llu iterations\n", totalIterations);
+    Serial.printf("[TITAN] Total C3 Calculations: %llu iterations\n", totalIterations);
 
-    // Titan Points: Adjusted for SSAA complexity
-    float score = ((float)totalIterations * 1.5f) / renderTime;
-    Serial.printf("[TITAN] Final Score: %.2f TITAN-PTS\n\n", score);
-    
-    // Result Screen
+    sendCommand("avr32:bench-stop");
+    uint64_t esp8266Iters = awaitBenchResult(5000);
+    Serial.printf("[TITAN] ESP8266 contributed %llu iterations\n", esp8266Iters);
+
+    uint64_t combinedIterations = totalIterations + esp8266Iters;
+    float score = ((float)combinedIterations * 1.5f) / renderTime;
+    Serial.printf("[TITAN] Combined Score: %.2f TITAN-PTS (%llu total iters)\n\n", score, combinedIterations);
+
     display.clearBuffer();
     display.setFont(u8g2_font_6x12_tr);
     display.drawStr(15, 15, "TITAN CORE SCORE");
@@ -115,8 +122,13 @@ void renderC3Titan() {
     display.drawStr(80, 45, "TITAN-PTS");
     
     char timeStr[48];
-    sprintf(timeStr, "Time: %dms | Iter: %llu", (int)renderTime, totalIterations);
+    sprintf(timeStr, "Time: %dms | T:%llu", (int)renderTime, combinedIterations);
     display.drawStr(5, 62, timeStr);
+    
+    display.setFont(u8g2_font_4x6_tr);
+    char coopStr[48];
+    sprintf(coopStr, "C3:%llu + ESP:%llu", totalIterations, esp8266Iters);
+    display.drawStr(5, 55, coopStr);
     
     display.sendBuffer();
     
@@ -136,9 +148,10 @@ void runBenchMyESP() {
     display.drawHLine(0, 18, 128);
     
     display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(5, 30, "Complexity: TITAN (SSAA 2x2)");
-    display.drawStr(5, 38, "Precision: SW Double-Float");
-    display.drawStr(5, 46, "Iteration: 1024-Peak");
+    display.drawStr(5, 28, "Dual-Core: C3 + ESP8266");
+    display.drawStr(5, 36, "Complexity: TITAN (SSAA 2x2)");
+    display.drawStr(5, 44, "Precision: SW Double-Float");
+    display.drawStr(5, 52, "Iteration: 1024-Peak");
     
     display.drawStr(10, 62, "[OK] BENCHMARK [LONG] EXIT");
     display.sendBuffer();

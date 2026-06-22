@@ -51,6 +51,12 @@ static float animCursorX = 10;
 static float animCursorY = 10;
 static bool showProps = false;
 static char pendingLua[128] = {0};
+static bool redrawNeeded = true;
+
+// Cached visible items to avoid cache reads every frame
+static FileItem cachedItems[FM_PAGE_SIZE];
+static int cachedStart = -1;
+static String cachedCacheName = "";
 
 // ─────────────────────────────────────────────────────────────
 //  Logic
@@ -63,13 +69,15 @@ static String getPathHash(const char* path) {
 
 static void scanDirectory() {
     if (fmMode == MODE_DRIVES) {
-        itemCount = 1; // Only Internal Flash
+        itemCount = 1;
+        cachedStart = -1;
         return;
     }
 
     String cacheName = "fm_" + getPathHash(currentPath);
     if (C3FS_Cache::refineCache(cacheName.c_str(), sizeof(FileItem))) {
         itemCount = C3FS_Cache::getCacheCount(cacheName.c_str(), sizeof(FileItem));
+        cachedStart = -1;
         return;
     }
 
@@ -98,31 +106,51 @@ static void scanDirectory() {
     }
     itemCount = items.size();
     C3FS_Cache::saveCache(cacheName.c_str(), items.data(), sizeof(FileItem), items.size());
+    cachedStart = -1;
+}
+
+static void loadVisibleItems() {
+    int start = (cursor / FM_PAGE_SIZE) * FM_PAGE_SIZE;
+    cachedCacheName = "fm_" + getPathHash(currentPath);
+    for (int i = 0; i < FM_PAGE_SIZE; i++) {
+        int idx = start + i;
+        if (idx >= itemCount) break;
+        C3FS_Cache::readCacheItem(cachedCacheName.c_str(), idx, &cachedItems[i], sizeof(FileItem));
+    }
+    cachedStart = start;
 }
 
 static void onUp() {
     if (showProps) return;
+    int prev = cursor;
     cursor = (cursor > 0) ? cursor - 1 : itemCount - 1;
+    if ((cursor / FM_PAGE_SIZE) != (prev / FM_PAGE_SIZE)) loadVisibleItems();
+    redrawNeeded = true;
 }
 
 static void onDown() {
     if (showProps) return;
+    int prev = cursor;
     cursor = (cursor < itemCount - 1) ? cursor + 1 : 0;
+    if ((cursor / FM_PAGE_SIZE) != (prev / FM_PAGE_SIZE)) loadVisibleItems();
+    redrawNeeded = true;
 }
 
 static void onOK() {
-    if (showProps) { showProps = false; return; }
+    if (showProps) { showProps = false; redrawNeeded = true; return; }
 
     if (fmMode == MODE_DRIVES) {
         fmMode = MODE_FILES;
         strcpy(currentPath, "/");
         cursor = 0;
         scanDirectory();
+        loadVisibleItems();
+        redrawNeeded = true;
         return;
     }
 
-    FileItem selected;
     String cacheName = "fm_" + getPathHash(currentPath);
+    FileItem selected;
     if (!C3FS_Cache::readCacheItem(cacheName.c_str(), cursor, &selected, sizeof(FileItem))) return;
 
     if (selected.isDir) {
@@ -136,16 +164,18 @@ static void onOK() {
         }
         cursor = 0;
         scanDirectory();
+        loadVisibleItems();
+        redrawNeeded = true;
     } else {
         char full[128];
         snprintf(full, 128, "%s%s%s", currentPath, currentPath[strlen(currentPath)-1]=='/'?"":"/", selected.name);
-        if (String(selected.name).endsWith(".lua")) { strcpy(pendingLua, full); exitManager = true; }
-        else if (String(selected.name).endsWith(".ch8")) { strcpy(pendingLua, "CHIP8:"); strcat(pendingLua, full); exitManager = true; }
+        if (String(selected.name).endsWith(".lua")) { strcpy(pendingLua, full); }
+        else if (String(selected.name).endsWith(".ch8")) { strcpy(pendingLua, "CHIP8:"); strcat(pendingLua, full); }
     }
 }
 
 static void onAction() {
-    if (fmMode == MODE_DRIVES) showProps = !showProps;
+    if (fmMode == MODE_DRIVES) { showProps = !showProps; redrawNeeded = true; }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -200,14 +230,11 @@ static void drawUI() {
             if (fmMode == MODE_DRIVES) {
                 display.drawXBMP(ix + 4, iy, 16, 16, icon_drive);
                 display.drawStr(ix, iy + 22, "Internal");
-            } else {
-                FileItem it;
-                String cacheName = "fm_" + getPathHash(currentPath);
-                if (C3FS_Cache::readCacheItem(cacheName.c_str(), idx, &it, sizeof(FileItem))) {
-                    display.drawXBMP(ix + 4, iy, 16, 16, it.isDir ? icon_folder : icon_file);
-                    char t[10]; strncpy(t, it.name, 6); t[6] = 0;
-                    display.drawStr(ix, iy + 22, t);
-                }
+            } else if (idx >= cachedStart && idx < cachedStart + FM_PAGE_SIZE) {
+                int ci = idx - cachedStart;
+                display.drawXBMP(ix + 4, iy, 16, 16, cachedItems[ci].isDir ? icon_folder : icon_file);
+                char t[10]; strncpy(t, cachedItems[ci].name, 6); t[6] = 0;
+                display.drawStr(ix, iy + 22, t);
             }
         }
     }
@@ -216,8 +243,9 @@ static void drawUI() {
 
 void runFileManager() {
     fmMode = MODE_DRIVES; cursor = 0; exitManager = false; showProps = false;
-    animCursorX = 10; animCursorY = 15;
+    animCursorX = 10; animCursorY = 15; redrawNeeded = true;
     scanDirectory();
+    loadVisibleItems();
     
     btnUp.attachClick(onUp); 
     btnDown.attachClick(onDown);
@@ -228,23 +256,55 @@ void runFileManager() {
     while (!exitManager) {
         esp_task_wdt_reset();
         btnUp.tick(); btnDown.tick(); btnOK.tick(); btnAction.tick();
-        drawUI();
-        delay(16);
+
         if (pendingLua[0]) {
             if (strncmp(pendingLua, "CHIP8:", 6) == 0) {
                  const char *romPath = pendingLua + 6;
                  myChip8.init(&display);
                  if (myChip8.loadROM(romPath)) {
                      myChip8.start();
-                     // Simplified runner for context
+                     // Chip8 runs in a background task — wait for user to exit
+                     bool chip8Done = false;
+                     while (!chip8Done) {
+                         btnUp.tick(); btnDown.tick(); btnOK.tick(); btnAction.tick();
+                         if (digitalRead(BUTTON_ACTION) == LOW) {
+                             unsigned long start = millis();
+                             while (digitalRead(BUTTON_ACTION) == LOW) {
+                                 if (millis() - start > 1000) {
+                                     chip8Done = true;
+                                     break;
+                                 }
+                                 delay(10);
+                                 esp_task_wdt_reset();
+                             }
+                         }
+                         delay(20);
+                         esp_task_wdt_reset();
+                     }
+                     myChip8.stop();
                  }
             } else {
                  runLuaScript(pendingLua);
             }
             pendingLua[0] = 0;
             delay(200);
-            scanDirectory(); // Refresh cache in case script modified files
+            scanDirectory();
+            loadVisibleItems();
+            redrawNeeded = true;
+            exitManager = true;
+            break;
         }
+
+        int tx = 10 + (cursor % COLS) * 40 - 2;
+        int ty = 15 + ((cursor % FM_PAGE_SIZE) / COLS) * 24 - 2;
+        bool cursorMoving = fabs(animCursorX - tx) > 0.5f || fabs(animCursorY - ty) > 0.5f;
+
+        if (redrawNeeded || cursorMoving) {
+            drawUI();
+            redrawNeeded = false;
+        }
+
+        delay(cursorMoving ? 16 : 33);
     }
     drawMenu();
 }

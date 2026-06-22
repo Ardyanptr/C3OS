@@ -14,3 +14,5 @@ void debugESP8266Connection();
 void force_stop_task();
 
 bool awaitResponse(const char* response, uint32_t timeoutMs);
+
+uint64_t awaitBenchResult(uint32_t timeoutMs);

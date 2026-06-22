@@ -168,3 +168,29 @@ bool awaitResponse(const char* response, uint32_t timeoutMs) {
 
     return false;
 }
+
+uint64_t awaitBenchResult(uint32_t timeoutMs) {
+    uint32_t start = millis();
+    static char buffer[128];
+    int idx = 0;
+
+    while (millis() - start < timeoutMs) {
+        while (Serial1.available()) {
+            char c = Serial1.read();
+
+            if (c == '\n') {
+                buffer[idx] = '\0';
+                if (strncmp(buffer, "BENCH:RESULT:", 13) == 0) {
+                    return strtoull(buffer + 13, NULL, 10);
+                }
+                idx = 0;
+            } else if (idx < sizeof(buffer) - 1) {
+                buffer[idx++] = c;
+            }
+        }
+
+        vTaskDelay(5);
+    }
+
+    return 0;
+}
