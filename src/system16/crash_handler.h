@@ -54,7 +54,7 @@ static void cr_initButtons() {
     pinMode(BUTTON_ACTION, INPUT_PULLUP);
 }
 
-enum CrBtn { CR_NONE, CR_OK, CR_OK_LONG, CR_UP, CR_DOWN, CR_ACTION_LONG };
+enum CrBtn { CR_NONE, CR_OK, CR_OK_LONG, CR_UP, CR_DOWN, CR_ACTION, CR_ACTION_LONG };
 
 static CrBtn cr_readBtn() {
     static uint32_t okHeld = 0, actHeld = 0;
@@ -75,6 +75,7 @@ static CrBtn cr_readBtn() {
         if (actHeld == 0) actHeld = millis();
         if (millis() - actHeld > 800) { actHeld = 0; return CR_ACTION_LONG; }
     } else {
+        if (actHeld > 0 && millis() - actHeld < 800) { actHeld = 0; return CR_ACTION; }
         actHeld = 0;
     }
 
@@ -184,6 +185,18 @@ static void cr_saveLog() {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  RCPM force-bootloader helper
+// ─────────────────────────────────────────────────────────────
+static void cr_forceBootloader() {
+    if (LittleFS.begin(false)) {
+        if (!LittleFS.exists("/cfg")) LittleFS.mkdir("/cfg");
+        File f = LittleFS.open("/cfg/force_bootloader", "w");
+        if (f) { f.print("1"); f.close(); }
+    }
+    esp_restart();
+}
+
+// ─────────────────────────────────────────────────────────────
 //  Page 1 — Panic summary
 // ─────────────────────────────────────────────────────────────
 static bool cr_page1() {
@@ -223,6 +236,7 @@ static bool cr_page1() {
         esp_task_wdt_reset();
         delay(30);
         CrBtn b = cr_readBtn();
+        if (b == CR_ACTION)  cr_forceBootloader();
         if (b == CR_OK)      return false; // go to dump
         if (b == CR_OK_LONG) return true;  // skip to actions
     }
@@ -264,6 +278,7 @@ static void cr_page2() {
         esp_task_wdt_reset();
         delay(30);
         CrBtn b = cr_readBtn();
+        if (b == CR_ACTION)  cr_forceBootloader();
         if (b == CR_UP   && scroll > 0)                          { scroll--; redraw(); }
         if (b == CR_DOWN && scroll + VISIBLE < cr_dumpCount)     { scroll++; redraw(); }
         if (b == CR_OK)  break;
@@ -317,6 +332,7 @@ static CrAction cr_page3() {
         esp_task_wdt_reset();
         delay(30);
         CrBtn b = cr_readBtn();
+        if (b == CR_ACTION)  cr_forceBootloader();
         if (b == CR_UP   && sel > 0)              { sel--; redraw(); }
         if (b == CR_DOWN && sel < CR_ACT_COUNT-1) { sel++; redraw(); }
         if (b == CR_OK)  return (CrAction)sel;
@@ -352,6 +368,7 @@ static bool cr_page4(const char *actionLabel) {
             esp_task_wdt_reset();
             delay(30);
             CrBtn b = cr_readBtn();
+            if (b == CR_ACTION)  cr_forceBootloader();
             if (b == CR_OK)      return true;  // restart now
             if (b == CR_OK_LONG) return false; // cancel → back to menu
         }
@@ -363,6 +380,11 @@ static bool cr_page4(const char *actionLabel) {
 //  Execute chosen action
 // ─────────────────────────────────────────────────────────────
 static void cr_executeAction(CrAction act) {
+    // Remove crash metrics to prevent duplicate safe-mode diag screen
+    if (LittleFS.begin(false) && LittleFS.exists("/cfg/crash_metrics.json")) {
+        LittleFS.remove("/cfg/crash_metrics.json");
+    }
+
     switch (act) {
     case CR_ACT_RESTART:
         // default — just fall through to esp_restart()

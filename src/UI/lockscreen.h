@@ -316,12 +316,13 @@ inline void showLockscreen(bool isWake) {
         display.drawStr(64 - strW / 2 + offsetX, drawY + 8, passStr.c_str());
 
         display.setDrawColor(1);
-        display.sendBuffer();
 
         if (firstFrame) {
             UX::TransitionEffects::fadeIn();
             firstFrame = false;
         }
+
+        display.sendBuffer();
 
         if (idx >= CODE_LEN && !isShaking) {
             bool ok = true;

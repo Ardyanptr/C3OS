@@ -26,6 +26,7 @@
 #include "component/process_manager.h"
 #include "UI/task_manager.h"
 #include "app/CrashApp/CrashEngine.h"
+#include "component/hardware/eeprom.h"
 
 #include "esp_console.h"
 #include "linenoise/linenoise.h"
@@ -111,16 +112,16 @@ void appHeartBeat() {
 
     TaskHandle_t current = xTaskGetCurrentTaskHandle();
     auto& procs = ProcessManager::instance().getProcesses();
-    for (auto& p : procs) {
-        if (p.handle == current) {
+    for (auto* p : procs) {
+        if (p->handle == current) {
             int fgId = ProcessManager::instance().getForegroundId();
-            if (p.id != fgId) {
-                Serial.printf("[PROC] Suspending background task %s (ID: %d)\n", p.name, p.id);
-                p.state = PROC_BACKGROUND;
+            if (p->id != fgId) {
+                Serial.printf("[PROC] Suspending background task %s (ID: %d)\n", p->name, p->id);
+                p->state = PROC_BACKGROUND;
                 
                 vTaskSuspend(NULL);
 
-                Serial.printf("[PROC] Resumed task %s (ID: %d)\n", p.name, p.id);
+                Serial.printf("[PROC] Resumed task %s (ID: %d)\n", p->name, p->id);
                 esp_task_wdt_reset();
                 appLastBeat = millis();
             }
@@ -412,10 +413,17 @@ void drawMenu() {
     systemUIActive = sysConfig.system_ui_active;
 
     if (menuEntranceRequested) {
-        menuYOffset = 64.0f;
+        // Instant menu appearance - no slow animation
+        menuYOffset = 0.0f;
         menuEntranceRequested = false;
+        // Restore contrast to normal immediately
+        display.setContrast(Settings::instance->get().oledContrast);
     }
-    menuYOffset += (0.0f - menuYOffset) * 0.15f;
+    
+    // Fast return to menu position
+    if (abs(menuYOffset) > 0.1f) {
+        menuYOffset += (0.0f - menuYOffset) * 0.5f;
+    }
 
     display.setFont(u8g2_font_7x14_tr);
     display.clearBuffer();
@@ -451,19 +459,11 @@ void drawMenu() {
 
     display.setDrawColor(1);
     display.sendBuffer();
-
-    static bool needsFadeIn = false;
-    if (menuYOffset > 60.0f) needsFadeIn = true;
-    
-    if (needsFadeIn) {
-        UX::TransitionEffects::fadeIn();
-        needsFadeIn = false;
-    }
 }
 
 void updateScroll() {
-    StateManager::saveState(menuIndex, -1, false);
-    const int visibleItemsCount = 4;
+    // Skip state saving - no persistent ID tracking
+    const int visibleItemsCount = 3;
     int newScrollOffset = targetScrollOffset;
 
     if (menuIndex < newScrollOffset) {
@@ -510,12 +510,6 @@ static void animateLaunch(const char* name) {
     }
 
     delay(300);
-
-    for (int i = Settings::instance->get().oledContrast; i >= 0; i -= 15) {
-        display.setContrast(i);
-        delay(10);
-        esp_task_wdt_reset();
-    }
 }
 
 static void animateExit(const char* name) {
@@ -528,6 +522,8 @@ static void animateExit(const char* name) {
 
 void runApp(int index) {
     if (index < 0 || index >= menuCount) return;
+
+    detachCallback();
 
     AppDesc& app = appTable[index];
     if (ESP.getFreeHeap() < app.minHeap) return;
@@ -549,15 +545,13 @@ void runApp(int index) {
     appRunning = true;
     currentApp = index;
 
+    // Wait for the app's task to finish (foreground changes away from this pid)
+    // The app task handles its own button input - do NOT tick OneButton here
+    // to avoid race conditions with the app's own button handling.
     while (ProcessManager::instance().getForegroundId() == pid) {
-        btnUp.tick();
-        btnDown.tick();
-        btnOK.tick();
-        btnAction.tick();
-        
         if (digitalRead(BUTTON_ACTION) == LOW) {
             unsigned long start = millis();
-            while(digitalRead(BUTTON_ACTION) == LOW) {
+            while (digitalRead(BUTTON_ACTION) == LOW) {
                 if (millis() - start > 1000) {
                     ProcessManager::instance().setForeground(-1);
                     break;
@@ -567,18 +561,11 @@ void runApp(int index) {
             }
         }
 
-        if (!appRunning) {
-            static unsigned long lastMenuAnim = 0;
-            unsigned long nowMs = millis();
-            if (nowMs - lastMenuAnim > 50) {
-                skipButtonInit = true;
-                drawMenu();
-                skipButtonInit = false;
-                lastMenuAnim = nowMs;
-            }
-        }
+        // Process cleanup while waiting – update() removes finished Process
+        // entries and resets foregroundId so the loop can exit.
+        ProcessManager::instance().update();
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(20));
         esp_task_wdt_reset();
         last_heartbeat = millis();
     }
@@ -586,11 +573,12 @@ void runApp(int index) {
     appRunning = false;
     currentApp = -1;
 
+    // Detach any stale app callbacks before re-initializing menu
+    detachCallback();
     animateExit(app.name);
-    Liveness::Notifications::show("App Backgrounded");
 
-    StateManager::saveState(menuIndex, -1, false);
-
+    // Reset menu state for a smooth entrance
+    menuYOffset = 0.0f;
     menuEntranceRequested = true;
     drawMenu();
 }
@@ -709,6 +697,251 @@ static int do_read_file(int argc, char **argv) {
     return 0;
 }
 
+static void handleDeploy(String& inputBuffer) {
+    String rest = inputBuffer.substring(7);
+    rest.trim();
+
+    int spaceIdx = rest.indexOf(' ');
+    String gameName, portStr;
+    int port = 80;
+
+    if (spaceIdx < 0) {
+        gameName = rest;
+    } else {
+        gameName = rest.substring(0, spaceIdx);
+        portStr = rest.substring(spaceIdx + 1);
+        portStr.trim();
+        if (portStr.length() > 0) {
+            port = portStr.toInt();
+        }
+    }
+
+    if (gameName.length() == 0) {
+        Serial.println("Usage: deploy <gamename> [port]");
+        Serial.println("Example: deploy mygame 8080");
+        return;
+    }
+
+    if (port <= 0 || port > 65535) {
+        Serial.println("ERROR: Invalid port number (1-65535)");
+        return;
+    }
+
+    Serial.println("\n=== C3OS GAME DEPLOYMENT ===");
+    Serial.println("================================");
+    Serial.print("Game: "); Serial.println(gameName);
+
+    display.clearBuffer();
+    display.setFont(u8g2_font_6x10_tr);
+    display.drawStr(0, 10, "Deploying Game...");
+    display.drawStr(0, 25, ("Game: " + gameName).c_str());
+    display.drawStr(0, 40, ("Port: " + String(port)).c_str());
+    display.sendBuffer();
+
+    Serial.print("\n[1/5] Checking WiFi connectivity... ");
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("\n  WiFi not connected. Starting AP mode...");
+        WiFi.mode(WIFI_AP);
+        WiFi.softAP(("C3OS-" + gameName).c_str(), NULL, 1, 0, 1);
+        Serial.println("  AP started! Connect WiFi to C3OS-" + gameName);
+    } else {
+        Serial.println("CONNECTED");
+    }
+    bool isAP = (WiFi.status() != WL_CONNECTED);
+    IPAddress localIP = isAP ? WiFi.softAPIP() : WiFi.localIP();
+
+    Serial.print("  IP: "); Serial.println(localIP);
+    if (!isAP) {
+        Serial.print("  SSID: "); Serial.println(WiFi.SSID());
+        Serial.print("  RSSI: "); Serial.print(WiFi.RSSI()); Serial.println(" dBm");
+    }
+
+    Serial.print("\n[2/5] Setting hostname... ");
+    String hostname = "C3OS-" + gameName;
+    if (!isAP) {
+        WiFi.setHostname(hostname.c_str());
+    }
+    Serial.println(hostname);
+
+    if (!isAP) {
+        Serial.println("\n[3/5] Testing mirrors...");
+        const char* mirrorIPs[] = {"8.8.8.8", "1.1.1.1", "208.67.222.222", "9.9.9.9"};
+        const char* mirrorNames[] = {"Google", "Cloudflare", "OpenDNS", "Quad9"};
+        int mirrorCount = 4;
+        int best = 99999;
+        int bestIdx = -1;
+        int losses = 0;
+
+        for (int i = 0; i < mirrorCount; i++) {
+            Serial.print("  "); Serial.print(mirrorNames[i]);
+            Serial.print(" ("); Serial.print(mirrorIPs[i]); Serial.print(")... ");
+            IPAddress pingIP;
+            pingIP.fromString(mirrorIPs[i]);
+            WiFiClient c;
+            unsigned long start = micros();
+            bool ok = c.connect(pingIP, 53, 1000);
+            unsigned long elapsed = micros() - start;
+            if (ok) {
+                c.stop();
+                int ms = elapsed / 1000;
+                Serial.print(ms); Serial.println(" ms");
+                if (ms < best) { best = ms; bestIdx = i; }
+            } else {
+                Serial.println("TIMEOUT");
+                losses++;
+            }
+        }
+
+        int lossPct = (losses * 100) / mirrorCount;
+        Serial.print("  Packet loss: "); Serial.print(lossPct); Serial.println("%");
+        if (bestIdx >= 0) {
+            Serial.print("  Fastest: "); Serial.print(mirrorNames[bestIdx]);
+            Serial.print(" ("); Serial.print(best); Serial.println(" ms)");
+        }
+
+        Serial.println("\n[4/5] Packet transfer check...");
+        WiFiClient tc;
+        unsigned long t0 = micros();
+        if (tc.connect("8.8.8.8", 53, 2000)) {
+            tc.stop();
+            unsigned long rtt = (micros() - t0) / 1000;
+            Serial.print("  RTT: "); Serial.print(rtt); Serial.println(" ms");
+            Serial.println("  Status: OK");
+        } else {
+            Serial.println("  Status: WARNING (limited connectivity)");
+        }
+    } else {
+        Serial.println("\n[3/5] AP mode - skipping mirror tests");
+        Serial.println("[4/5] AP mode - skipping packet transfer test");
+    }
+
+    Serial.println("\n[5/5] Launching server...");
+    WiFiServer server(port);
+    server.begin();
+
+    Serial.println("\n========================================");
+    Serial.println("  DEPLOYMENT COMPLETE!");
+    Serial.println("========================================");
+    Serial.print("  Game     : "); Serial.println(gameName);
+    Serial.print("  Address  : "); Serial.print(localIP); Serial.print(":"); Serial.println(port);
+    Serial.print("  Hostname : "); Serial.println(hostname);
+    Serial.print("  Mode     : "); Serial.println(isAP ? "AP (hotspot)" : "STA (WiFi)");
+    Serial.println("  Status   : RUNNING");
+    Serial.println("----------------------------------------");
+    Serial.print("  Connect  : telnet "); Serial.print(localIP); Serial.print(" "); Serial.println(port);
+    Serial.println("========================================\n");
+
+    display.clearBuffer();
+    display.setFont(u8g2_font_5x7_tr);
+    display.drawStr(0, 8, "GAME SERVER ONLINE");
+    display.drawHLine(0, 10, 128);
+    display.drawStr(0, 20, ("Game: " + gameName).c_str());
+    display.drawStr(0, 30, (localIP.toString() + ":" + String(port)).c_str());
+    display.drawStr(0, 40, ("Host: " + hostname).c_str());
+    display.drawStr(0, 55, "Type 'stop' to quit");
+    display.sendBuffer();
+
+    int secret = esp_random() % 100 + 1;
+    WiFiClient clients[5];
+    int nclients = 0;
+    bool running = true;
+    unsigned long lastLog = 0;
+
+    while (running) {
+        esp_task_wdt_reset();
+
+        WiFiClient newc = server.available();
+        if (newc) {
+            if (nclients < 5) {
+                clients[nclients] = newc;
+                clients[nclients].println("=== " + gameName + " on C3OS ===");
+                clients[nclients].println("Guess number 1-100. Type 'guess <n>' or 'quit'");
+                nclients++;
+                Serial.print("  [");
+                Serial.print(millis() / 1000);
+                Serial.print("s] [CONNECT] Players: ");
+                Serial.println(nclients);
+            } else {
+                newc.println("Server full (max 5)");
+                newc.stop();
+            }
+        }
+
+        for (int i = 0; i < nclients; i++) {
+            if (clients[i] && clients[i].connected()) {
+                if (clients[i].available()) {
+                    String cmd = clients[i].readStringUntil('\n');
+                    cmd.trim();
+                    if (cmd == "quit") {
+                        clients[i].println("Goodbye!");
+                        clients[i].stop();
+                        Serial.print("  [");
+                        Serial.print(millis() / 1000);
+                        Serial.print("s] [DISCONNECT] Player left (");
+                        Serial.print(nclients - 1);
+                        Serial.println(" remain)");
+                    } else if (cmd.startsWith("guess ")) {
+                        int g = cmd.substring(6).toInt();
+                        Serial.print("  [");
+                        Serial.print(millis() / 1000);
+                        Serial.print("s] Player guessed: ");
+                        Serial.println(g);
+                        if (g == secret) {
+                            clients[i].println("CORRECT! New number chosen.");
+                            secret = esp_random() % 100 + 1;
+                        } else if (g < secret) {
+                            clients[i].println("Higher!");
+                        } else {
+                            clients[i].println("Lower!");
+                        }
+                    } else {
+                        clients[i].println("Commands: guess <n>, quit");
+                    }
+                }
+            } else {
+                for (int j = i; j < nclients - 1; j++) {
+                    clients[j] = clients[j + 1];
+                }
+                nclients--;
+                i--;
+            }
+        }
+
+        if (millis() - lastLog > 10000) {
+            lastLog = millis();
+            Serial.print("  [");
+            Serial.print(millis() / 1000);
+            Serial.print("s] Server: ");
+            Serial.print(nclients);
+            Serial.println(" active connections");
+        }
+
+        btnOK.tick();
+        if (digitalRead(BUTTON_OK) == LOW) {
+            Serial.println("\n  [TERMINATE] OK button pressed, stopping server...");
+            running = false;
+        }
+
+        if (Serial.available()) {
+            String sc = Serial.readStringUntil('\n');
+            sc.trim();
+            if (sc.equalsIgnoreCase("stop") || sc.equalsIgnoreCase("exit") || sc.equalsIgnoreCase("terminate")) {
+                running = false;
+            }
+        }
+
+        delay(10);
+    }
+
+    server.close();
+    for (int i = 0; i < nclients; i++) {
+        if (clients[i]) clients[i].stop();
+    }
+    Serial.print("  [");
+    Serial.print(millis() / 1000);
+    Serial.println("s] Server stopped.");
+}
+
 // Setup
 
 void setup() {
@@ -753,6 +986,13 @@ void setup() {
         Serial.printf("[WDT] Warning: esp_task_wdt_add returned 0x%x\n", wdt_err); // ESP_ERR_INVALID_ARG means task already subscribed — that's fine
     }
     esp_task_wdt_reset();
+
+    if (LittleFS.begin(false) && LittleFS.exists("/cfg/force_bootloader")) {
+        LittleFS.remove("/cfg/force_bootloader");
+        BootloaderUI bl(&display, &btnUp, &btnDown, &btnOK);
+        bl.showMenu(3600);
+        esp_restart();
+    }
 
     BootloaderUI bootloader(&display, &btnUp, &btnDown, &btnOK);
     BootMode selectedMode = bootloader.showMenu(3);
@@ -884,14 +1124,219 @@ void setup() {
                                     Serial.println("File not found.");
                                 }
                             }
+                            else if (inputBuffer.startsWith("deploy ")) {
+                                handleDeploy(inputBuffer);
+                            }
                             else if (inputBuffer.equalsIgnoreCase("help")) {
                                 Serial.println("Supported commands:");
-                                Serial.println("  DIR   - List files in LittleFS");
-                                Serial.println("  TYPE  - Display contents of a file (e.g., type boot.txt)");
-                                Serial.println("  MEM   - Check free memory/RAM");
-                                Serial.println("  VER   - Display C3-DOS version");
-                                Serial.println("  CLS   - Clear screen");
-                                Serial.println("  EXIT  - Return to Main OS Menu");
+                                Serial.println("  DIR          - List files in LittleFS");
+                                Serial.println("  TYPE         - Display contents (e.g., type boot.txt)");
+                                Serial.println("  MEM          - Check free memory");
+                                Serial.println("  VER          - Display version");
+                                Serial.println("  CLS          - Clear screen");
+                                Serial.println("  DEPLOY       - Host game server (deploy <name> [port])");
+                                Serial.println("  EEPROM       - EEPROM info/status");
+                                Serial.println("  EEPROM SAVE  - Save settings to EEPROM");
+                                Serial.println("  EEPROM LOAD  - Load settings from EEPROM");
+                                Serial.println("  READ EEPROM  - Raw hex dump (e.g., read EEPROM 0 32)");
+                                Serial.println("  WRITE EEPROM - Raw byte write (e.g., write EEPROM 0 48 65)");
+                                Serial.println("  FLASH EEPROM - Erase entire EEPROM chip");
+                                Serial.println("  EXIT         - Return to Main OS Menu");
+                            }
+                            else if (inputBuffer.startsWith("read EEPROM") || inputBuffer.startsWith("read eeprom") || inputBuffer.startsWith("READ EEPROM")) {
+                                String rest = inputBuffer.substring(11);
+                                rest.trim();
+                                int spaceIdx = rest.indexOf(' ');
+                                if (spaceIdx > 0) {
+                                    String addrStr = rest.substring(0, spaceIdx);
+                                    String lenStr = rest.substring(spaceIdx + 1);
+                                    addrStr.trim();
+                                    lenStr.trim();
+
+                                    uint16_t addr = (uint16_t)strtoul(addrStr.c_str(), NULL, 0);
+                                    uint16_t len = (uint16_t)strtoul(lenStr.c_str(), NULL, 0);
+
+                                    if (len == 0) {
+                                        Serial.println("Error: length must be > 0");
+                                    } else {
+                                        if (addr + len > EEPROM_SIZE) len = EEPROM_SIZE - addr;
+                                        if (len > 256) len = 256;
+
+                                        uint8_t buffer[256];
+                                        if (eep.readBlock(addr, buffer, len)) {
+                                            Serial.printf("EEPROM dump @0x%04X (%d bytes):\n", addr, len);
+                                            for (uint16_t i = 0; i < len; i++) {
+                                                if (i % 16 == 0) {
+                                                    if (i > 0) Serial.println();
+                                                    Serial.printf("  %04X: ", addr + i);
+                                                }
+                                                Serial.printf("%02X ", buffer[i]);
+                                            }
+                                            Serial.println();
+
+                                            display.clearBuffer();
+                                            char line[32];
+                                            snprintf(line, sizeof(line), "EEPROM @0x%04X", addr);
+                                            display.drawStr(0, 10, line);
+                                            int oledY = 25;
+                                            for (uint16_t i = 0; i < min(len, (uint16_t)16); i++) {
+                                                if (i % 8 == 0) { display.setCursor(0, oledY); oledY += 12; }
+                                                display.print(buffer[i], HEX);
+                                                display.print(" ");
+                                            }
+                                        } else {
+                                            Serial.println("Error reading EEPROM");
+                                            display.clearBuffer();
+                                            display.drawStr(0, 10, "EEPROM Read Error");
+                                        }
+                                    }
+                                } else {
+                                    Serial.println("Usage: read EEPROM [address] [length]");
+                                }
+                            }
+                            else if (inputBuffer.startsWith("write EEPROM") || inputBuffer.startsWith("write eeprom") || inputBuffer.startsWith("WRITE EEPROM")) {
+                                String rest = inputBuffer.substring(12);
+                                rest.trim();
+                                int spaceIdx = rest.indexOf(' ');
+                                if (spaceIdx > 0) {
+                                    String addrStr = rest.substring(0, spaceIdx);
+                                    String dataStr = rest.substring(spaceIdx + 1);
+                                    addrStr.trim();
+                                    dataStr.trim();
+
+                                    uint16_t addr = (uint16_t)strtoul(addrStr.c_str(), NULL, 0);
+                                    uint8_t data[256];
+                                    uint16_t dataLen = 0;
+                                    int pos = 0;
+
+                                    while (pos < dataStr.length() && dataLen < 256) {
+                                        while (pos < dataStr.length() && dataStr[pos] == ' ') pos++;
+                                        if (pos >= dataStr.length()) break;
+                                        int endPos = pos;
+                                        while (endPos < dataStr.length() && dataStr[endPos] != ' ') endPos++;
+                                        String token = dataStr.substring(pos, endPos);
+                                        data[dataLen++] = (uint8_t)strtoul(token.c_str(), NULL, 16);
+                                        pos = endPos + 1;
+                                    }
+
+                                    if (dataLen == 0) {
+                                        Serial.println("Error: no data bytes specified");
+                                    } else if (addr + dataLen > EEPROM_SIZE) {
+                                        Serial.println("Error: data exceeds EEPROM bounds");
+                                    } else {
+                                        if (eep.writeBlock(addr, data, dataLen)) {
+                                            Serial.printf("Wrote %d bytes to EEPROM @0x%04X\n", dataLen, addr);
+                                            display.clearBuffer();
+                                            char line[32];
+                                            snprintf(line, sizeof(line), "Wrote %d bytes", dataLen);
+                                            display.drawStr(0, 10, line);
+                                            snprintf(line, sizeof(line), "to 0x%04X", addr);
+                                            display.drawStr(0, 25, line);
+                                        } else {
+                                            Serial.println("Error writing EEPROM");
+                                            display.clearBuffer();
+                                            display.drawStr(0, 10, "EEPROM Write Error");
+                                        }
+                                    }
+                                } else {
+                                    Serial.println("Usage: write EEPROM [address] [byte1] [byte2] ...");
+                                }
+                            }
+                            else if (inputBuffer.equalsIgnoreCase("EEPROM") || inputBuffer.equalsIgnoreCase("EEPROM INFO")) {
+                                uint16_t totalBlocks = EEPROM_SIZE / BLOCK_SIZE;
+                                uint16_t usedBlocks = 0;
+                                for (uint16_t b = 0; b < totalBlocks; b++) {
+                                    uint8_t marker;
+                                    eep.readBlock(b * BLOCK_SIZE, &marker, 1);
+                                    if (marker != 0xFF) usedBlocks++;
+                                }
+
+                                Serial.printf("EEPROM: %d KB (%d bytes)\n", EEPROM_SIZE / 1024, EEPROM_SIZE);
+                                Serial.printf("Block size: %d bytes, Total blocks: %d\n", BLOCK_SIZE, totalBlocks);
+                                Serial.printf("Used blocks: %d, Free blocks: %d\n", usedBlocks, totalBlocks - usedBlocks);
+
+                                bool hasSettings = false;
+                                if (Settings::instance) {
+                                    uint8_t buf[BLOCK_SIZE];
+                                    hasSettings = readLastValidBlock(buf, BLOCK_SIZE - 1);
+                                }
+                                Serial.printf("Settings on EEPROM: %s\n", hasSettings ? "YES" : "NO");
+
+                                display.clearBuffer();
+                                char line[32];
+                                snprintf(line, sizeof(line), "EEPROM %dKB", EEPROM_SIZE / 1024);
+                                display.drawStr(0, 10, line);
+                                snprintf(line, sizeof(line), "Free: %d blocks", totalBlocks - usedBlocks);
+                                display.drawStr(0, 25, line);
+                                display.drawStr(0, 40, hasSettings ? "Settings: SAVED" : "Settings: NONE");
+                            }
+                            else if (inputBuffer.equalsIgnoreCase("EEPROM SAVE")) {
+                                if (Settings::instance) {
+                                    if (Settings::instance->saveToEEPROM()) {
+                                        display.clearBuffer();
+                                        display.drawStr(0, 10, "EEPROM Save OK");
+                                        display.sendBuffer();
+                                        Serial.println("Settings saved to EEPROM");
+                                    } else {
+                                        display.clearBuffer();
+                                        display.drawStr(0, 10, "EEPROM Save FAILED");
+                                        display.sendBuffer();
+                                        Serial.println("Error: Failed to save to EEPROM");
+                                    }
+                                } else {
+                                    display.clearBuffer();
+                                    display.drawStr(0, 10, "Settings not avail");
+                                    display.sendBuffer();
+                                    Serial.println("Error: Settings not available");
+                                }
+                            }
+                            else if (inputBuffer.equalsIgnoreCase("EEPROM LOAD")) {
+                                if (Settings::instance) {
+                                    if (Settings::instance->loadFromEEPROM()) {
+                                        display.clearBuffer();
+                                        display.drawStr(0, 10, "EEPROM Load OK");
+                                        display.sendBuffer();
+                                        Settings::instance->apply();
+                                        Serial.println("Settings loaded from EEPROM and applied");
+                                    } else {
+                                        display.clearBuffer();
+                                        display.drawStr(0, 10, "No EEPROM data");
+                                        display.sendBuffer();
+                                        Serial.println("Error: No valid settings on EEPROM");
+                                    }
+                                } else {
+                                    display.clearBuffer();
+                                    display.drawStr(0, 10, "Settings not avail");
+                                    display.sendBuffer();
+                                    Serial.println("Error: Settings not available");
+                                }
+                            }
+                            else if (inputBuffer.equalsIgnoreCase("flash EEPROM")) {
+                                Serial.println("Flashing EEPROM (writing 0xFF to all bytes)...");
+                                display.clearBuffer();
+                                display.drawStr(0, 10, "Flashing EEPROM...");
+                                display.sendBuffer();
+
+                                uint8_t page[64];
+                                memset(page, 0xFF, 64);
+
+                                for (uint16_t addr = 0; addr < EEPROM_SIZE; addr += 64) {
+                                    eep.writeBlock(addr, page, 64);
+                                    if (addr % 4096 == 0) {
+                                        Serial.printf("  Progress: %d/%d bytes\n", addr, EEPROM_SIZE);
+                                        display.clearBuffer();
+                                        char line[32];
+                                        snprintf(line, sizeof(line), "Flash %d/%d", addr, EEPROM_SIZE);
+                                        display.drawStr(0, 10, line);
+                                        display.sendBuffer();
+                                    }
+                                    esp_task_wdt_reset();
+                                }
+
+                                Serial.println("EEPROM flash complete!");
+                                display.clearBuffer();
+                                display.drawStr(0, 10, "EEPROM Flash OK");
+                                display.sendBuffer();
                             }
                             else if (inputBuffer.equalsIgnoreCase("exit")) {
                                 Serial.println("Exiting DOS environment...");

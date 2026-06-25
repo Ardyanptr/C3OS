@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "eeprom.h"
+#include "esp_task_wdt.h"
 
 uint8_t crc8(uint8_t *data, uint8_t len) {
     uint8_t crc = 0;
@@ -18,6 +19,8 @@ uint16_t findEmptyBlock() {
     for(uint16_t block=0; block<(EEPROM_SIZE/BLOCK_SIZE); block++) {
         uint8_t marker = readEEPROM(block*BLOCK_SIZE);
         if(marker == 0xFF) return block;
+        // Reset watchdog periodically during EEPROM scan
+        if(block % 64 == 0) esp_task_wdt_reset();
     }
 
     return 0xFFFF;
@@ -49,8 +52,9 @@ bool writeBlockSafe(uint8_t *data, uint8_t len) {
 
 bool readLastValidBlock(uint8_t *data, uint8_t len) {
     int16_t lastBlock = -1;
+    const int16_t totalBlocks = (EEPROM_SIZE/BLOCK_SIZE);
 
-    for(int16_t block=(EEPROM_SIZE/BLOCK_SIZE)-1; block>=0;block--) {
+    for(int16_t block=totalBlocks-1; block>=0;block--) {
         uint16_t addr = block * BLOCK_SIZE;
         uint8_t buffer[BLOCK_SIZE];
         for(uint8_t i=0;i<BLOCK_SIZE;i++) buffer[i] = readEEPROM(addr+i);
@@ -61,6 +65,8 @@ bool readLastValidBlock(uint8_t *data, uint8_t len) {
             for(uint8_t i=0;i<len && i<BLOCK_SIZE-1;i++) data[i] = buffer[i];
             return true;
         }
+        // Reset watchdog periodically during EEPROM scan
+        if(block % 64 == 0) esp_task_wdt_reset();
     }
 
     return false;

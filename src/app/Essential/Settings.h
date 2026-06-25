@@ -37,6 +37,8 @@ class Settings {
     void loadSettings();
     void load();
     void save();
+    bool saveToEEPROM();
+    bool loadFromEEPROM();
     void apply();
     Data& get();
 
@@ -50,6 +52,7 @@ class Settings {
 
     float animCursorY = 0;
     const uint8_t itemHeight = 12;
+    static const uint8_t totalItems = 12;
 
     volatile bool flagUp = false;
     volatile bool flagDown = false;

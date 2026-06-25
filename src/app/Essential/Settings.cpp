@@ -3,6 +3,10 @@
 #include <WiFi.h>
 #include "esp_task_wdt.h"
 #include "system16/esp826.h"
+#include "system16/power_manager.h"
+#include "component/hardware/eeprom.h"
+
+extern PowerManager gPower;
 
 Settings* Settings::instance = nullptr;
 
@@ -46,8 +50,17 @@ void Settings::begin() {
 }
 
 void Settings::load() {
+    Serial.println("Settings trying to appy load");
+
     bool success = false;
-    if (LittleFS.exists(SETTINGS_PATH)) {
+
+    if (loadFromEEPROM()) {
+        success = true;
+        Serial.println("Settings loaded from external EEPROM");
+    }
+
+    Serial.println("Settings trying to access LittleFS");
+    if (!success && LittleFS.exists(SETTINGS_PATH)) {
         File file = LittleFS.open(SETTINGS_PATH, "r");
         if (file) {
             if (file.read((uint8_t*)&data, sizeof(Data)) == sizeof(Data)) {
@@ -55,7 +68,7 @@ void Settings::load() {
                 bool crcValid = (data.checksum == calculateChecksum(data));
                 if (sigValid && crcValid) {
                     success = true;
-                    Serial.println(data.aodPin);
+                    Serial.println("Settings loaded from LittleFS");
                 }
             }
             file.close();
@@ -77,6 +90,7 @@ void Settings::load() {
         data.proximityValue = 100;
         data.BLEProximity = true;
         data.checksum = calculateChecksum(data);
+        Serial.println("Settings initialized to defaults");
     }
 }
 
@@ -89,6 +103,31 @@ void Settings::save() {
         file.write((const uint8_t*)&data, sizeof(Data));
         file.close();
     }
+
+    saveToEEPROM();
+}
+
+bool Settings::saveToEEPROM() {
+    data.signature = 0x53455431;
+    data.checksum = calculateChecksum(data);
+    bool ok = writeBlockSafe((uint8_t*)&data, (uint8_t)sizeof(Data));
+    if (ok) {
+        writeEEPROM(SETTINGS_MARKER_ADDR, SETTINGS_MARKER_VAL);
+    }
+    return ok;
+}
+
+bool Settings::loadFromEEPROM() {
+    uint8_t buffer[BLOCK_SIZE];
+    if (readLastValidBlock(buffer, BLOCK_SIZE - 1)) {
+        Data* candidate = (Data*)buffer;
+        if (candidate->signature == 0x53455431 && candidate->checksum == calculateChecksum(*candidate)) {
+            memcpy(&data, buffer, sizeof(Data));
+            writeEEPROM(SETTINGS_MARKER_ADDR, SETTINGS_MARKER_VAL);
+            return true;
+        }
+    }
+    return false;
 }
 
 void Settings::loadSettings() {
@@ -117,6 +156,8 @@ void Settings::apply() {
     }
 
     setCpuFrequencyMhz(data.cpuFrequency);
+
+    gPower.setProfile(data.gameMode ? PowerManager::Performance : PowerManager::Balanced);
 }
 
 void Settings::draw() {
@@ -127,15 +168,16 @@ void Settings::draw() {
 
     static float scrollY = 0;
     float targetScrollY = 0;
-    if (cursor > 3) {
-        targetScrollY = (cursor - 3) * itemHeight;
+    const uint8_t visibleItems = 5;
+    if (cursor >= visibleItems) {
+        targetScrollY = (cursor - (visibleItems - 1)) * itemHeight;
     }
+    float maxScroll = max(0, (totalItems * itemHeight) - 64);
+    targetScrollY = min(targetScrollY, (float)maxScroll);
     scrollY += (targetScrollY - scrollY) * 0.2f;
 
     const char* labels[] = {"Bluetooth", "WiFi Status", "TX Power", "Brightness", "Sleep", "AOD Wake",
                             "Mem Fusion", "CPU Freq", "Game Mode", "Fastboot", "Proximity", "Find My"};
-
-    uint8_t totalItems = sizeof(labels) / sizeof(labels[0]);
 
     display.setDrawColor(1);
     display.drawRBox(0, (int)(animCursorY - scrollY) + 1, 128, 12, 2);
@@ -196,7 +238,7 @@ void Settings::handleInput() {
     if (flagUp) {
         flagUp = false;
         if (!editing) {
-            cursor = (cursor == 0) ? 10 : cursor - 1;
+            cursor = (cursor == 0) ? (totalItems - 1) : cursor - 1;
         } else {
             if (cursor == 2) data.wifiPower = (data.wifiPower >= 100) ? 100 : data.wifiPower + 10;
             if (cursor == 3) {
@@ -214,7 +256,7 @@ void Settings::handleInput() {
     if (flagDown) {
         flagDown = false;
         if (!editing) {
-            cursor = (cursor == 10) ? 0 : cursor + 1;
+            cursor = (cursor == (totalItems - 1)) ? 0 : cursor + 1;
         } else {
             if (cursor == 2) data.wifiPower = (data.wifiPower <= 10) ? 0 : data.wifiPower - 10;
             if (cursor == 3) {

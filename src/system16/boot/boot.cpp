@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "component/hardware/eeprom.h"
 #include "component/queuer.h"
 #include "component/ui_enhancements.h"
 #include "component/wifiservice.h"
@@ -13,6 +14,7 @@
 #include "system16/oled_animation.h"
 #include "system16/state.h"
 #include "system16/update.h"
+#include "app/Essential/Settings.h"
 
 std::vector<String> bootLogs;
 const int MAX_LOG_LINES = 5;
@@ -35,27 +37,34 @@ static float bootProgress = 0.0f;
 
 static void drawBootUI() {
     display.clearBuffer();
-    
-    // Draw C3 Logo in top right
     display.setDrawColor(1);
-    display.drawXBM(100, 2, 16, 11, image_C3_bits);
-    
-    // Draw Logs
-    display.setFont(u8g2_font_4x6_tr);
-    for (uint8_t i = 0; i < SB_VISIBLE; i++) {
-        int16_t idx = (int16_t)sb_scroll + i;
-        if (idx >= (int16_t)sb_count) break;
-        uint8_t slot2 = (uint8_t)(idx % SB_MAX_LINES);
-        display.drawStr(0, (i + 1) * SB_LINE_H, sb_buf[slot2]);
+
+    // Breathing centered C3OS logo
+    float breath = (sin(millis() / 600.0) + 1.0) / 2.0;
+    int logoSize = 22 + (int)(breath * 4);
+    int logoX = 64 - logoSize / 2;
+    int logoY = 22 - logoSize / 2;
+    display.drawXBM(logoX, logoY, logoSize, logoSize, image_C3_bits);
+
+    // Rotating circular progress ring
+    float angle = (millis() / 800.0) * 6.2832;
+    float ringRadius = 18.0f;
+    int cx = 64, cy = 22;
+    int arcPoints = (int)(bootProgress * 20);
+    for (int i = 0; i < arcPoints; i++) {
+        float a = angle + (i / 20.0f) * 6.2832f;
+        int px = cx + (int)(cos(a) * ringRadius);
+        int py = cy + (int)(sin(a) * ringRadius);
+        display.drawPixel(px, py);
     }
 
-    // Draw Real Progress Bar at bottom
-    display.drawFrame(0, 56, 128, 8);
-    int barWidth = (int)(bootProgress * 126);
+    // Clean thin progress bar at bottom
+    display.drawFrame(4, 56, 120, 6);
+    int barWidth = (int)(bootProgress * 118);
     if (barWidth > 0) {
-        display.drawBox(1, 57, barWidth, 6);
+        display.drawBox(5, 57, barWidth, 4);
     }
-    
+
     display.sendBuffer();
 }
 
@@ -148,6 +157,7 @@ RTC_DATA_ATTR int boot_count = 0;
 
 extern uint32_t SLEEP_TIMEOUT;
 extern void enable_pm();
+extern uint8_t getBatteryPercent();
 
 uint16_t cpuFrequency = 160;
 bool isFastBoot = false;
@@ -304,6 +314,7 @@ void initEEPROM() {
             Wire.endTransmission();
             delay(5);
         }
+        esp_task_wdt_reset();  // Reset watchdog after each page write
     }
 
     writeEEPROM(INIT_FLAG_ADDR, 0xAA);
@@ -442,7 +453,7 @@ void printLog(const char* text) {
         logBuffer[MAX_LINES - 1] = text;
     }
 
-    scrollY_Log += LINE_H;
+    scrollY_Log += LINE_HEIGHT;
     isScrolling_Log = true;
 }
 
@@ -458,14 +469,14 @@ void drawLog() {
         }
     }
 
-    int maxVisible = SCREEN_H / LINE_H;
+    int maxVisible = SCREEN_H / LINE_HEIGHT;
     int startIndex = max(0, logCount - maxVisible);
 
     for (int i = 0; i < maxVisible; i++) {
         int idx = startIndex + i;
         if (idx >= logCount) break;
 
-        int yPos = (i * LINE_H) - (int)scrollY_Log + LINE_H;
+        int yPos = (i * LINE_HEIGHT) - (int)scrollY_Log + LINE_HEIGHT;
 
         if (yPos >= 0 && yPos <= SCREEN_H) {
             display.drawStr(0, yPos, logBuffer[idx]);
@@ -614,10 +625,22 @@ void fast_boot() {
 
     display.sendBuffer();
     boot_count = 0;
+
+    {
+        bool hasSettings = (readEEPROM(SETTINGS_MARKER_ADDR) == SETTINGS_MARKER_VAL);
+        display.setFont(u8g2_font_6x10_tr);
+        display.clearBuffer();
+        display.drawStr(0, 15, "EEPROM: 32KB (AT24C256)");
+        display.drawStr(0, 30, hasSettings ? "Settings: SAVED" : "Settings: EMPTY");
+        display.sendBuffer();
+        delay(1000);
+    }
+
     showLockscreen(true);
 }
 
 void safe_boot();
+static bool gPowerSaveForced = false;
 
 void full_boot() {
     pinMode(BUTTON_ACTION, INPUT_PULLUP);
@@ -629,6 +652,44 @@ void full_boot() {
         panic(PANIC_IPC_DROP, "RECOVERY MODE ACTIVE");
         runBIOS();
         return;
+    }
+
+    // Check for brownout or low battery
+    {
+        esp_reset_reason_t rst_reason = esp_reset_reason();
+        if (rst_reason == ESP_RST_BROWNOUT || getBatteryPercent() < 15) {
+            display.clearBuffer();
+            display.setFont(u8g2_font_6x10_tf);
+            if (rst_reason == ESP_RST_BROWNOUT) {
+                display.drawStr(10, 20, "BROWNOUT DETECTED");
+            } else {
+                display.drawStr(15, 20, "LOW BATTERY");
+            }
+            display.setFont(u8g2_font_4x6_tr);
+            display.drawStr(10, 35, "Enable Power Save Mode?");
+            display.drawStr(10, 50, "OK=Enable  ACT=Skip");
+            display.sendBuffer();
+
+            unsigned long waitStart = millis();
+            bool enablePowerSave = false;
+            while (millis() - waitStart < 10000) {
+                esp_task_wdt_reset();
+                if (digitalRead(BUTTON_OK) == LOW) {
+                    enablePowerSave = true;
+                    break;
+                }
+                if (digitalRead(BUTTON_ACTION) == LOW) {
+                    break;
+                }
+                delay(50);
+            }
+            if (enablePowerSave) {
+                setCpuFrequencyMhz(80);
+                gPower.setProfile(PowerManager::PowerSave);
+                gPowerSaveForced = true;
+                bootLogs.push_back("> PowerSave enabled");
+            }
+        }
     }
 
     display.clearBuffer();
@@ -669,6 +730,7 @@ void full_boot() {
         lnx_log("i2c: found device at 0x50 (EEPROM)", 0.30f);
         initEEPROM();
         lnx_log("eeprom: AT24C256 identified", 0.32f);
+        lnx_log("eeprom: AT24C256 32KB initialized", 0.34f);
     } else {
         lnx_log("i2c: no eeprom found at 0x50", 0.32f);
     }
@@ -706,27 +768,46 @@ void full_boot() {
 
     lnx_log("Applying system settings...", 0.80f);
     setting.loadSettings();
+    esp_task_wdt_reset();  // Reset watchdog after loading settings
     SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
     cpuFrequency = Settings::instance->get().cpuFrequency;
     setCpuFrequencyMhz(cpuFrequency);
+    esp_task_wdt_reset();  // Reset watchdog after setting CPU frequency
 
     lnx_log("Probing coprocessor (ESP8266)...", 0.85f);
     if (!sysConfig.no_init) {
         setupESP8266Communication();
+        esp_task_wdt_reset();  // Reset watchdog after ESP8266 setup
         sendCommand("32:start");
+        esp_task_wdt_reset();  // Reset watchdog after sending command
         lnx_log("uart: bridge established", 0.90f);
     }
 
     lnx_log("Starting networking stack...", 0.92f);
     lnx_log("net: radio initialized", 0.94f);
+    esp_task_wdt_reset();  // Reset watchdog after networking init
 
     lnx_log("Running system startup...", 0.96f);
     applyPendingUpdate();
+    esp_task_wdt_reset();  // Reset watchdog after update check
     startService();
+    esp_task_wdt_reset();  // Reset watchdog after starting services
 
     lnx_log("C3OS-init: boot finished", 1.0f);
+    esp_task_wdt_reset();  // Reset watchdog before final delay
     delay(500);
-    
+
+    {
+        bool hasSettings = (readEEPROM(SETTINGS_MARKER_ADDR) == SETTINGS_MARKER_VAL);
+        display.clearBuffer();
+        display.setFont(u8g2_font_6x10_tr);
+        display.drawStr(0, 15, "EEPROM: 32KB (AT24C256)");
+        display.drawStr(0, 30, hasSettings ? "Settings: SAVED" : "Settings: EMPTY");
+        display.drawStr(0, 50, "Hold ACTION for BIOS");
+        display.sendBuffer();
+        delay(1000);
+    }
+
     boot_count = 0;
     UX::TransitionEffects::fadeOut();
     showLockscreen(true);
@@ -827,18 +908,25 @@ void safe_boot() {
 
     // ── CPU frequency ────────────────────────────────────────
     {
+        uint16_t cpuMhz = gPowerSaveForced ? 80 : Settings::instance->get().cpuFrequency;
+        if (cpuMhz < 80 || cpuMhz > 160) cpuMhz = 80;
         SB_BEGIN("CPU freq");
-        setCpuFrequencyMhz(80);  // safe mode = 80MHz
+        setCpuFrequencyMhz(cpuMhz);
         SB_END("OK");
-        SB_NOTE("Set to 80MHz");
+        SB_NOTE("Set to %dMHz", cpuMhz);
     }
 
     // ── Power manager ────────────────────────────────────────
     {
         SB_BEGIN("PowerManager");
         enable_pm();
-        gPower.begin(PowerManager::PowerSave);
-        gPower.setAutoSleepTimeout(0);
+        PowerManager::Profile pmProfile = gPowerSaveForced
+                                              ? PowerManager::PowerSave
+                                              : (Settings::instance->get().gameMode
+                                                     ? PowerManager::Performance
+                                                     : PowerManager::Balanced);
+        gPower.begin(pmProfile);
+        gPower.setAutoSleepTimeout(Settings::instance->get().sleepTimeout);
         gPower.setPreSleepCallback([]() { stopAllService(); });
         gPower.setPostWakeCallback([]() { startService(); });
         gPower.setDisplayPowerCallback([](bool on) {
@@ -852,7 +940,10 @@ void safe_boot() {
             else display.setContrast(Settings::instance->get().oledContrast);
         });
         SB_END("OK");
-        SB_NOTE("Mode=PowerSave AutoSleep=off");
+        SB_NOTE("Mode=%s Sleep=%lums",
+                pmProfile == PowerManager::Performance ? "Performance" :
+                pmProfile == PowerManager::PowerSave ? "PowerSave" : "Balanced",
+                (unsigned long)gPower.getAutoSleepTimeout());
     }
 
     // ── Background services ──────────────────────────────────

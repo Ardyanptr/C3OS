@@ -13,7 +13,7 @@ BootloaderUI::BootloaderUI(U8G2 *disp, OneButton *up, OneButton *down, OneButton
     instance = this;
 }
 
-BootMode BootloaderUI::showMenu(uint8_t autoBootSeconds) {
+BootMode BootloaderUI::showMenu(uint16_t autoBootSeconds) {
     startTime = millis();
     menuActive = true;
     selectionMade = false;

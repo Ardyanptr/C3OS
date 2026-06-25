@@ -22,10 +22,10 @@ int ProcessManager::launchApp(int appIndex) {
     if (appIndex < 0 || appIndex >= APP_COUNT) return -1;
     
     // Check if already running
-    for (auto& proc : processes) {
-        if (proc.appIndex == appIndex && proc.state != PROC_FINISHED && proc.state != PROC_KILLED) {
-            setForeground(proc.id);
-            return proc.id;
+    for (auto* proc : processes) {
+        if (proc->appIndex == appIndex && proc->state != PROC_FINISHED && proc->state != PROC_KILLED) {
+            setForeground(proc->id);
+            return proc->id;
         }
     }
 
@@ -34,10 +34,10 @@ int ProcessManager::launchApp(int appIndex) {
     while (ESP.getFreeHeap() < targetApp.minHeap && !processes.empty()) {
         int toKillId = -1;
         String toKillName = "";
-        for (auto& proc : processes) {
-            if (proc.state == PROC_BACKGROUND) {
-                toKillId = proc.id;
-                toKillName = proc.name;
+        for (auto* proc : processes) {
+            if (proc->state == PROC_BACKGROUND) {
+                toKillId = proc->id;
+                toKillName = proc->name;
                 break;
             }
         }
@@ -48,43 +48,45 @@ int ProcessManager::launchApp(int appIndex) {
         killProcess(toKillId);
     }
 
-    Process proc;
-    proc.id = nextId++;
-    proc.appIndex = appIndex;
-    proc.name = appTable[appIndex].name;
-    proc.state = PROC_RUNNING;
-    proc.startTime = millis();
-    proc.lastHeartbeat = millis();
+    Process* proc = new Process();
+    proc->id = nextId++;
+    proc->appIndex = appIndex;
+    proc->name = appTable[appIndex].name;
+    proc->state = PROC_RUNNING;
+    proc->startTime = millis();
+    proc->lastHeartbeat = millis();
+    proc->handle = NULL;
     
     processes.push_back(proc);
-    Process* procPtr = &processes.back();
 
     BaseType_t res = xTaskCreate(
         appTaskWrapper,
-        procPtr->name,
+        proc->name,
         8192, // Increased stack for apps
-        (void*)procPtr,
+        (void*)proc,
         1,
-        &procPtr->handle
+        &proc->handle
     );
 
     if (res != pdPASS) {
         processes.pop_back();
+        delete proc;
         return -1;
     }
 
-    foregroundId = procPtr->id;
-    return procPtr->id;
+    foregroundId = proc->id;
+    return proc->id;
 }
 
 void ProcessManager::killProcess(int id) {
     for (auto it = processes.begin(); it != processes.end(); ++it) {
-        if (it->id == id) {
-            if (it->handle) {
-                vTaskDelete(it->handle);
+        if ((*it)->id == id) {
+            if ((*it)->handle) {
+                vTaskDelete((*it)->handle);
             }
-            it->state = PROC_KILLED;
+            (*it)->state = PROC_KILLED;
             if (foregroundId == id) foregroundId = -1;
+            delete *it;
             processes.erase(it);
             return;
         }
@@ -92,16 +94,16 @@ void ProcessManager::killProcess(int id) {
 }
 
 void ProcessManager::setForeground(int id) {
-    for (auto& proc : processes) {
-        if (proc.id == id) {
-            proc.state = PROC_RUNNING;
+    for (auto* proc : processes) {
+        if (proc->id == id) {
+            proc->state = PROC_RUNNING;
             foregroundId = id;
-            if (proc.handle != NULL) {
-                Serial.printf("[PROC] Resuming task %s (ID: %d)\n", proc.name, proc.id);
-                vTaskResume(proc.handle);
+            if (proc->handle != NULL) {
+                Serial.printf("[PROC] Resuming task %s (ID: %d)\n", proc->name, proc->id);
+                vTaskResume(proc->handle);
             }
-        } else if (proc.state == PROC_RUNNING) {
-            proc.state = PROC_BACKGROUND;
+        } else if (proc->state == PROC_RUNNING) {
+            proc->state = PROC_BACKGROUND;
             // The task will suspend itself on its next heartbeat
         }
     }
@@ -110,8 +112,9 @@ void ProcessManager::setForeground(int id) {
 void ProcessManager::update() {
     // Cleanup finished processes
     for (auto it = processes.begin(); it != processes.end(); ) {
-        if (it->state == PROC_FINISHED || it->state == PROC_KILLED) {
-            if (foregroundId == it->id) foregroundId = -1;
+        if ((*it)->state == PROC_FINISHED || (*it)->state == PROC_KILLED) {
+            if (foregroundId == (*it)->id) foregroundId = -1;
+            delete *it;
             it = processes.erase(it);
         } else {
             ++it;
@@ -125,9 +128,9 @@ static bool isCurrentTaskForeground() {
 
     TaskHandle_t current = xTaskGetCurrentTaskHandle();
     auto& procs = ProcessManager::instance().getProcesses();
-    for (auto& p : procs) {
-        if (p.handle == current) {
-            return p.id == fgId;
+    for (auto* p : procs) {
+        if (p->handle == current) {
+            return p->id == fgId;
         }
     }
     return true; // System services

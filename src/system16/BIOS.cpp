@@ -48,6 +48,7 @@ void bios_i2c_scan() {
     float scanProgress = 0;
 
     for (uint8_t addr = 1; addr < 127; addr++) {
+        esp_task_wdt_reset();
         scanProgress = addr / 127.0;
 
         display.clearBuffer();
@@ -90,6 +91,7 @@ void bios_eeprom_test() {
 
     float p = 0;
     while (p < 1) {
+        esp_task_wdt_reset();
         p += 0.05;
         display.clearBuffer();
         display.drawStr(25, 10, "EEPROM TEST");
@@ -202,6 +204,7 @@ void bios_kill_switch() {
     bool confirmed = false;
 
     while (millis() - holdStart < 4000) {
+        esp_task_wdt_reset();
         if (digitalRead(BUTTON_OK) == LOW) {
             if (millis() - holdStart > 3000) {
                 confirmed = true;
@@ -297,6 +300,7 @@ void runBIOS() {
     unsigned long lastActivity = millis();
 
     while (!exitBIOS) {
+        esp_task_wdt_reset();
         if (upFlag_BIOS) {
             sel = (sel - 1 + itemCount) % itemCount;
             upFlag_BIOS = false;

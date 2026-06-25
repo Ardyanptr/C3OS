@@ -21,7 +21,7 @@ extern SemaphoreHandle_t i2cMutex;
 #define INIT_FLAG_ADDR 0
 
 #define SCREEN_H 64
-#define LINE_H 16
+#define LINE_HEIGHT 16
 #define MAX_LINES 16
 
 #define OS_VERSION "b0.1.0"

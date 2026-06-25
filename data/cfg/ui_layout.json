@@ -1,9 +1,9 @@
 {
     "ui": {
         "scroll_duration": 300,
-        "visible_items": 6,
+        "visible_items": 3,
         "text_offset_y": 12,
-        "draw_count": 5
+        "draw_count": 4
     },
     "system": {
         "anr_active": false,

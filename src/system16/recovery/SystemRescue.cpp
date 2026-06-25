@@ -18,14 +18,6 @@ const char* rescueLabels[] = {
     "5. Restart Normally"
 };
 
-const char* rescueHints[] = {
-    "Scans & repairs errors",
-    "Speeds up system",
-    "ERASE EVERYTHING",
-    "Check if parts work",
-    "Go back to OS"
-};
-
 void SystemRescue::run(U8G2* display, OneButton* up, OneButton* down, OneButton* ok) {
     _display = display;
     _up = up;
@@ -72,13 +64,6 @@ void SystemRescue::showToolMenu() {
         _display->drawStr(4, y, rescueLabels[i]);
     }
     _display->setDrawColor(1);
-
-    // Help Box (Bottom)
-    _display->drawFrame(0, 48, 128, 16);
-    _display->setFont(u8g2_font_4x6_tr);
-    _display->drawStr(4, 56, "TIP:");
-    _display->drawStr(4, 62, rescueHints[_menuIdx]);
-
     _display->sendBuffer();
 }
 

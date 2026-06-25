@@ -9,7 +9,7 @@ class BootloaderUI {
   public:
     BootloaderUI(U8G2 *display, OneButton *btnUp, OneButton *btnDown, OneButton *btnOK);
 
-    BootMode showMenu(uint8_t autoBooteconds = 3);
+    BootMode showMenu(uint16_t autoBootSeconds = 3);
     void setSelection(BootMode mode);
 
   private:

@@ -24,14 +24,14 @@ void showTaskManager() {
         auto& pm = ProcessManager::instance();
         auto& procs = pm.getProcesses();
         if (tm_selected >= 0 && tm_selected < procs.size()) {
-            pm.setForeground(procs[tm_selected].id);
+            pm.setForeground(procs[tm_selected]->id);
         }
     });
     btnAction.attachClick([]() {
         auto& pm = ProcessManager::instance();
         auto& procs = pm.getProcesses();
         if (tm_selected >= 0 && tm_selected < procs.size()) {
-            pm.killProcess(procs[tm_selected].id);
+            pm.killProcess(procs[tm_selected]->id);
         }
     });
     btnAction.attachLongPressStart([]() {
@@ -73,11 +73,11 @@ void showTaskManager() {
                 display.setDrawColor(1);
             }
             
-            display.drawStr(2, y, procs[i].name);
+            display.drawStr(2, y, procs[i]->name);
             
             // Show RAM (stack water mark as a proxy)
             char ramBuf[16];
-            UBaseType_t watermark = uxTaskGetStackHighWaterMark(procs[i].handle);
+            UBaseType_t watermark = uxTaskGetStackHighWaterMark(procs[i]->handle);
             sprintf(ramBuf, "%u", watermark);
             display.drawStr(100, y, ramBuf);
             

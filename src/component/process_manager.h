@@ -32,14 +32,14 @@ public:
     void setForeground(int id);
     int getForegroundId() { return foregroundId; }
     
-    std::vector<Process>& getProcesses() { return processes; }
+    std::vector<Process*>& getProcesses() { return processes; }
     
     void update();
 
 private:
     ProcessManager() : nextId(1), foregroundId(-1) {}
     
-    std::vector<Process> processes;
+    std::vector<Process*> processes;
     int nextId;
     int foregroundId;
 };

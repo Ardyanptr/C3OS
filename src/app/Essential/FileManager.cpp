@@ -7,13 +7,10 @@
 #include "esp_task_wdt.h"
 #include "system16/emulator/Chip8.h"
 #include "system16/lua_l/lua_l.h"
-#include "../../system16/C3FS/C3FS_Cache.h"
+#include "system16/esp826.h"
 
 Chip8 myChip8;
 
-// ─────────────────────────────────────────────────────────────
-//  Icons (Modern Minimalist)
-// ─────────────────────────────────────────────────────────────
 static const unsigned char icon_folder[] PROGMEM = {
     0xfe, 0x07, 0x01, 0x08, 0x01, 0x08, 0xff, 0xff, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80,
     0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0xff, 0xff, 0x00, 0x00};
@@ -30,10 +27,7 @@ struct FileItem {
     size_t size;
 };
 
-// ─────────────────────────────────────────────────────────────
-//  State
-// ─────────────────────────────────────────────────────────────
-enum FM_Mode { MODE_DRIVES, MODE_FILES };
+enum FM_Mode { MODE_DRIVES, MODE_FILES, MODE_ESP8266_FILES };
 static FM_Mode fmMode = MODE_DRIVES;
 
 static char currentPath[64] = "/";
@@ -41,50 +35,81 @@ static int  cursor           = 0;
 static bool exitManager      = false;
 static int  itemCount        = 0;
 
-static const int ICON_W = 32;
-static const int ICON_H = 32;
-static const int COLS   = 3;
-static const int ROWS   = 2;
-static const int FM_PAGE_SIZE = COLS * ROWS;
+static const int LINE_H = 12;
+static const int VISIBLE_LINES = 4;
 
-static float animCursorX = 10;
-static float animCursorY = 10;
-static bool showProps = false;
-static char pendingLua[128] = {0};
+static std::vector<FileItem> fileList;
 static bool redrawNeeded = true;
-
-// Cached visible items to avoid cache reads every frame
-static FileItem cachedItems[FM_PAGE_SIZE];
-static int cachedStart = -1;
-static String cachedCacheName = "";
-
-// ─────────────────────────────────────────────────────────────
-//  Logic
-// ─────────────────────────────────────────────────────────────
-static String getPathHash(const char* path) {
-    uint32_t h = 0x811c9dc5;
-    while (*path) { h ^= (uint32_t)*path++; h *= 0x01000193; }
-    return String(h, HEX);
-}
+static char pendingLua[128] = {0};
 
 static void scanDirectory() {
+    fileList.clear();
     if (fmMode == MODE_DRIVES) {
-        itemCount = 1;
-        cachedStart = -1;
+        FileItem internal;
+        strcpy(internal.name, "Internal Flash");
+        internal.isDir = true;
+        internal.size = 0;
+        fileList.push_back(internal);
+
+        FileItem esp8266;
+        strcpy(esp8266.name, "ESP8266 Storage");
+        esp8266.isDir = true;
+        esp8266.size = 0;
+        fileList.push_back(esp8266);
+
+        itemCount = fileList.size();
         return;
     }
 
-    String cacheName = "fm_" + getPathHash(currentPath);
-    if (C3FS_Cache::refineCache(cacheName.c_str(), sizeof(FileItem))) {
-        itemCount = C3FS_Cache::getCacheCount(cacheName.c_str(), sizeof(FileItem));
-        cachedStart = -1;
+    if (fmMode == MODE_ESP8266_FILES) {
+        sendCommand("esp:list");
+
+        String buffer;
+        uint32_t start = millis();
+        while (millis() - start < 2000) {
+            while (Serial1.available()) {
+                char c = Serial1.read();
+                if (c == '\n') {
+                    buffer.trim();
+                    if (buffer == "OK") {
+                        itemCount = fileList.size();
+                        return;
+                    }
+                    if (buffer.length() > 0) {
+                        FileItem item;
+                        int comma = buffer.indexOf(',');
+                        if (comma > 0) {
+                            String fname = buffer.substring(0, comma);
+                            String fsize = buffer.substring(comma + 1);
+                            fsize.trim();
+                            strncpy(item.name, fname.c_str(), sizeof(item.name) - 1);
+                            item.name[sizeof(item.name) - 1] = 0;
+                            item.size = (size_t)fsize.toInt();
+                        } else {
+                            strncpy(item.name, buffer.c_str(), sizeof(item.name) - 1);
+                            item.name[sizeof(item.name) - 1] = 0;
+                            item.size = 0;
+                        }
+                        item.isDir = false;
+                        fileList.push_back(item);
+                    }
+                    buffer = "";
+                } else {
+                    buffer += c;
+                }
+            }
+            delay(5);
+        }
+        itemCount = fileList.size();
         return;
     }
 
-    std::vector<FileItem> items;
     if (strcmp(currentPath, "/") != 0) {
-        FileItem back; strcpy(back.name, ".."); back.isDir = true; back.size = 0;
-        items.push_back(back);
+        FileItem back;
+        strcpy(back.name, "..");
+        back.isDir = true;
+        back.size = 0;
+        fileList.push_back(back);
     }
 
     File root = LittleFS.open(currentPath);
@@ -99,59 +124,40 @@ static void scanDirectory() {
             item.name[sizeof(item.name) - 1] = 0;
             item.isDir = file.isDirectory();
             item.size = file.size();
-            items.push_back(item);
+            fileList.push_back(item);
             file = root.openNextFile();
         }
         root.close();
     }
-    itemCount = items.size();
-    C3FS_Cache::saveCache(cacheName.c_str(), items.data(), sizeof(FileItem), items.size());
-    cachedStart = -1;
-}
-
-static void loadVisibleItems() {
-    int start = (cursor / FM_PAGE_SIZE) * FM_PAGE_SIZE;
-    cachedCacheName = "fm_" + getPathHash(currentPath);
-    for (int i = 0; i < FM_PAGE_SIZE; i++) {
-        int idx = start + i;
-        if (idx >= itemCount) break;
-        C3FS_Cache::readCacheItem(cachedCacheName.c_str(), idx, &cachedItems[i], sizeof(FileItem));
-    }
-    cachedStart = start;
+    itemCount = fileList.size();
 }
 
 static void onUp() {
-    if (showProps) return;
-    int prev = cursor;
-    cursor = (cursor > 0) ? cursor - 1 : itemCount - 1;
-    if ((cursor / FM_PAGE_SIZE) != (prev / FM_PAGE_SIZE)) loadVisibleItems();
+    if (cursor > 0) cursor--; else cursor = itemCount - 1;
     redrawNeeded = true;
 }
 
 static void onDown() {
-    if (showProps) return;
-    int prev = cursor;
-    cursor = (cursor < itemCount - 1) ? cursor + 1 : 0;
-    if ((cursor / FM_PAGE_SIZE) != (prev / FM_PAGE_SIZE)) loadVisibleItems();
+    if (cursor < itemCount - 1) cursor++; else cursor = 0;
     redrawNeeded = true;
 }
 
 static void onOK() {
-    if (showProps) { showProps = false; redrawNeeded = true; return; }
-
     if (fmMode == MODE_DRIVES) {
-        fmMode = MODE_FILES;
-        strcpy(currentPath, "/");
+        if (cursor == 0) {
+            fmMode = MODE_FILES;
+            strcpy(currentPath, "/");
+        } else {
+            fmMode = MODE_ESP8266_FILES;
+        }
         cursor = 0;
         scanDirectory();
-        loadVisibleItems();
         redrawNeeded = true;
         return;
     }
 
-    String cacheName = "fm_" + getPathHash(currentPath);
-    FileItem selected;
-    if (!C3FS_Cache::readCacheItem(cacheName.c_str(), cursor, &selected, sizeof(FileItem))) return;
+    if (cursor < 0 || cursor >= itemCount) return;
+    FileItem& selected = fileList[cursor];
 
     if (selected.isDir) {
         if (strcmp(selected.name, "..") == 0) {
@@ -164,7 +170,6 @@ static void onOK() {
         }
         cursor = 0;
         scanDirectory();
-        loadVisibleItems();
         redrawNeeded = true;
     } else {
         char full[128];
@@ -175,81 +180,95 @@ static void onOK() {
 }
 
 static void onAction() {
-    if (fmMode == MODE_DRIVES) { showProps = !showProps; redrawNeeded = true; }
-}
-
-// ─────────────────────────────────────────────────────────────
-//  Drawing
-// ─────────────────────────────────────────────────────────────
-static void drawPie(int x, int y, int r, float p) {
-    display.drawCircle(x, y, r);
-    for (int a = 0; a < (int)(p * 360); a += 10) {
-        float rad = a * 0.01745f;
-        display.drawLine(x, y, (int)(x + cos(rad) * r), (int)(y + sin(rad) * r));
+    if (fmMode == MODE_DRIVES) {
+        exitManager = true;
+        return;
     }
+    fmMode = MODE_DRIVES;
+    cursor = 0;
+    scanDirectory();
+    redrawNeeded = true;
 }
 
 static void drawUI() {
     display.clearBuffer();
-    const int W = 128, H = 64;
 
-    if (showProps) {
-        display.drawRFrame(10, 5, 108, 54, 4);
-        display.setFont(u8g2_font_5x7_tr);
-        size_t total = LittleFS.totalBytes(), used = LittleFS.usedBytes();
-        drawPie(30, 32, 18, (float)used/total);
-        display.drawStr(55, 20, "Internal Flash");
-        display.drawStr(55, 30, "Type: LittleFS");
-        char buf[32];
-        snprintf(buf, 32, "Used: %d%%", (int)(used * 100 / total));
-        display.drawStr(55, 40, buf);
-        snprintf(buf, 32, "Free: %d KB", (int)((total-used)/1024));
-        display.drawStr(55, 50, buf);
+    display.setFont(u8g2_font_5x7_tr);
+    if (fmMode == MODE_DRIVES) {
+        display.drawStr(2, 8, "Select Drive");
+    } else if (fmMode == MODE_ESP8266_FILES) {
+        display.drawStr(2, 8, "ESP8266 Storage");
     } else {
-        display.setFont(u8g2_font_4x6_tr);
-        display.drawStr(2, 8, fmMode == MODE_DRIVES ? "Drives" : currentPath);
-        display.drawHLine(0, 10, W);
-
-        int start = (cursor / FM_PAGE_SIZE) * FM_PAGE_SIZE;
-        for (int i = 0; i < FM_PAGE_SIZE; i++) {
-            int idx = start + i;
-            if (idx >= itemCount) break;
-
-            int gx = i % COLS;
-            int gy = i / COLS;
-            int ix = 10 + gx * 40;
-            int iy = 15 + gy * 24;
-
-            if (idx == cursor) {
-                float tx = (float)ix - 2, ty = (float)iy - 2;
-                animCursorX += (tx - animCursorX) * 0.4f;
-                animCursorY += (ty - animCursorY) * 0.4f;
-                display.drawRFrame((int)animCursorX, (int)animCursorY, 28, 22, 2);
-            }
-
-            if (fmMode == MODE_DRIVES) {
-                display.drawXBMP(ix + 4, iy, 16, 16, icon_drive);
-                display.drawStr(ix, iy + 22, "Internal");
-            } else if (idx >= cachedStart && idx < cachedStart + FM_PAGE_SIZE) {
-                int ci = idx - cachedStart;
-                display.drawXBMP(ix + 4, iy, 16, 16, cachedItems[ci].isDir ? icon_folder : icon_file);
-                char t[10]; strncpy(t, cachedItems[ci].name, 6); t[6] = 0;
-                display.drawStr(ix, iy + 22, t);
-            }
-        }
+        display.drawStr(2, 8, currentPath);
     }
+    display.drawHLine(0, 10, 128);
+
+    int scrollOffset = 0;
+    if (cursor >= VISIBLE_LINES) scrollOffset = cursor - VISIBLE_LINES + 1;
+
+    for (int i = 0; i < VISIBLE_LINES; i++) {
+        int idx = scrollOffset + i;
+        if (idx >= itemCount) break;
+
+        int y = 21 + i * LINE_H;
+        bool selected = (idx == cursor);
+
+        if (selected) {
+            display.drawBox(0, y - 9, 128, LINE_H - 1);
+            display.setDrawColor(0);
+        } else {
+            display.setDrawColor(1);
+        }
+
+        const unsigned char* ico;
+        if (fmMode == MODE_DRIVES) {
+            ico = icon_drive;
+        } else if (fmMode == MODE_ESP8266_FILES) {
+            ico = icon_file;
+        } else if (idx == 0 && strcmp(currentPath, "/") != 0 && fileList[idx].isDir && strcmp(fileList[idx].name, "..") == 0) {
+            ico = icon_folder;
+        } else {
+            ico = fileList[idx].isDir ? icon_folder : icon_file;
+        }
+        display.drawXBMP(2, y - 7, 16, 16, ico);
+
+        display.setFont(u8g2_font_4x6_tr);
+        display.drawStr(20, y, fileList[idx].name);
+
+        if (!selected && !fileList[idx].isDir) {
+            char sz[16];
+            if (fileList[idx].size > 1024) {
+                snprintf(sz, sizeof(sz), "%uKB", (unsigned int)(fileList[idx].size / 1024));
+            } else {
+                snprintf(sz, sizeof(sz), "%uB", (unsigned int)fileList[idx].size);
+            }
+            uint8_t sw = display.getStrWidth(sz);
+            display.setDrawColor(1);
+            display.drawStr(128 - sw - 2, y, sz);
+        }
+
+        display.setDrawColor(1);
+    }
+
+    if (itemCount > VISIBLE_LINES) {
+        int barH = (VISIBLE_LINES * 44) / itemCount;
+        int barY = 12 + (scrollOffset * 44) / (itemCount - VISIBLE_LINES);
+        display.drawBox(126, barY, 2, barH);
+    }
+
+    display.setFont(u8g2_font_4x6_tr);
+    display.drawStr(2, 63, "OK=Open  ACT=Back");
     display.sendBuffer();
 }
 
 void runFileManager() {
-    fmMode = MODE_DRIVES; cursor = 0; exitManager = false; showProps = false;
-    animCursorX = 10; animCursorY = 15; redrawNeeded = true;
+    fmMode = MODE_DRIVES; cursor = 0; exitManager = false;
+    redrawNeeded = true;
     scanDirectory();
-    loadVisibleItems();
-    
-    btnUp.attachClick(onUp); 
+
+    btnUp.attachClick(onUp);
     btnDown.attachClick(onDown);
-    btnOK.attachClick(onOK); 
+    btnOK.attachClick(onOK);
     btnOK.attachLongPressStart([](){ exitManager = true; });
     btnAction.attachClick(onAction);
 
@@ -263,7 +282,6 @@ void runFileManager() {
                  myChip8.init(&display);
                  if (myChip8.loadROM(romPath)) {
                      myChip8.start();
-                     // Chip8 runs in a background task — wait for user to exit
                      bool chip8Done = false;
                      while (!chip8Done) {
                          btnUp.tick(); btnDown.tick(); btnOK.tick(); btnAction.tick();
@@ -289,22 +307,17 @@ void runFileManager() {
             pendingLua[0] = 0;
             delay(200);
             scanDirectory();
-            loadVisibleItems();
             redrawNeeded = true;
             exitManager = true;
             break;
         }
 
-        int tx = 10 + (cursor % COLS) * 40 - 2;
-        int ty = 15 + ((cursor % FM_PAGE_SIZE) / COLS) * 24 - 2;
-        bool cursorMoving = fabs(animCursorX - tx) > 0.5f || fabs(animCursorY - ty) > 0.5f;
-
-        if (redrawNeeded || cursorMoving) {
+        if (redrawNeeded) {
             drawUI();
             redrawNeeded = false;
         }
 
-        delay(cursorMoving ? 16 : 33);
+        delay(33);
     }
     drawMenu();
 }
