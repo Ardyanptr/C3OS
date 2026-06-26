@@ -717,8 +717,8 @@ static void handleDeploy(String& inputBuffer) {
     }
 
     if (gameName.length() == 0) {
-        Serial.println("Usage: deploy <gamename> [port]");
-        Serial.println("Example: deploy mygame 8080");
+        Serial.println("Usage: deploy <deployment_name> [port]");
+        Serial.println("Example: deploy example 8080");
         return;
     }
 
@@ -727,7 +727,7 @@ static void handleDeploy(String& inputBuffer) {
         return;
     }
 
-    Serial.println("\n=== C3OS GAME DEPLOYMENT ===");
+    Serial.println("\n=== C3OS EVVR DEPLOYMENT ===");
     Serial.println("================================");
     Serial.print("Game: "); Serial.println(gameName);
 
@@ -914,6 +914,12 @@ static void handleDeploy(String& inputBuffer) {
             Serial.print("s] Server: ");
             Serial.print(nclients);
             Serial.println(" active connections");
+
+            Serial.println();
+            Serial.print("  [");
+            Serial.print(millis() / 1000);
+            Serial.print("s] Server: ");
+            Serial.println("Heap: " + String(ESP.getFreeHeap()) + " bytes");
         }
 
         btnOK.tick();
