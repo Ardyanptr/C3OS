@@ -1,11 +1,14 @@
 {
 	"folders": [
 		{
-			"path": "../.."
+			"path": "."
 		},
 		{
-			"name": "ESP8266C3",
-			"path": "../../../ESP8266C3"
+			"path": "../ESP8266C3"
+		},
+		{
+			"name": "C3RP2040",
+			"path": "../C3RP2040"
 		}
 	],
 	"settings": {}

@@ -27,6 +27,8 @@
 #include "UI/task_manager.h"
 #include "app/CrashApp/CrashEngine.h"
 #include "component/hardware/eeprom.h"
+#include "component/rp2040link.h"
+#include "config/RPLinkCommands.h"
 
 #include "esp_console.h"
 #include "linenoise/linenoise.h"
@@ -60,7 +62,7 @@ void IRAM_ATTR watchdog_isr() {
 }
 
 // Board Info
-String BOARD_ATTACHED = "ESP32-C3"; // fixed
+String BOARD_ATTACHED = "ESP32-C3";
 int BOARD_REV = 4;
 
 // Start of Initializer
@@ -78,6 +80,8 @@ PowerManager gPower;
 DFRobot_VL53L0X sensor;
 // End of Initializer
 
+RTC_DATA_ATTR boot_mode_t boot_mode = BOOT_NORMAL;
+
 uint32_t appLastBeat = 0;
 uint8_t anrSelect = 0;
 
@@ -94,7 +98,6 @@ int longPressScrollCount = 0;
 int longPressUpActive = false;
 int longPressDownActive = false;
 
-RTC_DATA_ATTR boot_mode_t boot_mode = BOOT_NORMAL;
 uint32_t SLEEP_TIMEOUT;
 
 void showLockscreen(bool isWake);
@@ -129,6 +132,8 @@ void appHeartBeat() {
         }
     }
 }
+
+// Application Function Manager
 
 void runSettings() {
     setting.begin();
@@ -183,7 +188,7 @@ const char* menuItems[] = {
     "WiFi Sniffer",  "Beacon Spammer",  "Pong",           "Hotspot",       "Ruler",
     "Keyboard Cat",  "WiFi Storm",      "Echo Sniffer",   "IR Blaster",    "Flappy Bird",
     "Factory Reset", "Check Integrity", "Online Story",   "Heap Monitor",  "Stopwatch",
-    "BenchMyESP",    "Minecraft",       "Stardew Valley", "BLE Scan",      "C3 Burner",
+    "BenchMyESP",    "Minecraft",       "Stardew Valley", "Keyboard Emu",  "C3 Burner",
     "WiFi Telnet",   "Doom GL",         "File Manager",   "Store Manager", "Timer",
     "Update",        "Radar Maker",     "Prism Launcher", "Crash Manager"};
 
@@ -203,9 +208,11 @@ int targetScrollOffset = 0;
 bool isScrolling = false;
 bool notificationActive = false;
 bool isEjected = false;
+bool isGUIActive = true;
+
+int lastSelectedIndex = -1;
 
 String notificationText = "";
-int lastSelectedIndex = -1;
 
 void IRAM_ATTR onButton() { lastActive = millis(); }
 
@@ -238,22 +245,13 @@ void runGameClient_DOOM() {
 }
 
 void showShortcutGUI() {
-    display.clearBuffer();
-    display.setFontMode(1);
-    display.setBitmapMode(1);
-
-    display.drawRFrame(2, 1, 124, 52, 3);
-
-    display.setFont(u8g2_font_5x7_tr);
-    display.drawStr(6, 11, "DFU Mode");
-    display.drawStr(6, 19, "Lockscreen");
-
-    display.drawStr(9, 62, "1: 1, 2: 2, 3: 3, L: 4");
-    display.sendBuffer();
+    isGUIActive = true;
 
     detachCallback();
 
     btnOK.attachClick([]() {
+        isGUIActive = false;
+        
         display.clearBuffer();
 
         display.setFontMode(1);
@@ -270,6 +268,8 @@ void showShortcutGUI() {
 
         display.sendBuffer();
 
+        RP2040Link::sendCommand(RP2040::System::DFU);
+
         while (true) {
             esp_task_wdt_reset();
             vTaskDelay(5);
@@ -279,7 +279,10 @@ void showShortcutGUI() {
         initMenuButton();
         drawMenu();
     });
+
     btnOK.attachDoubleClick([]() {
+        isGUIActive = false;
+
         display.clearBuffer();
 
         showLockscreen(true);
@@ -287,6 +290,24 @@ void showShortcutGUI() {
         initMenuButton();
         drawMenu();
     });
+
+    while(isGUIActive) {
+        display.clearBuffer();
+        display.setFontMode(1);
+        display.setBitmapMode(1);
+
+        display.drawRFrame(2, 1, 124, 52, 3);
+
+        display.setFont(u8g2_font_5x7_tr);
+        display.drawStr(6, 11, "DFU Mode");
+        display.drawStr(6, 19, "Lockscreen");
+
+        display.drawStr(9, 62, "1: 1, 2: 2, 3: 3, L: 4");
+        display.sendBuffer();
+
+        esp_task_wdt_reset();
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
 }
 
 void syncESP8266() {
@@ -294,6 +315,9 @@ void syncESP8266() {
 
     draw_restartESP8266();
     setupESP8266Communication();
+    esp_task_wdt_reset();
+
+    RP2040Link::sendCommand(RP2040::System::Reset);
     esp_task_wdt_reset();
 
     sendCommand("32:start");
@@ -331,21 +355,7 @@ void syncESP8266() {
 }
 
 void showActionGUI() {
-    display.clearBuffer();
-    display.sendBuffer();
-
-    display.setBitmapMode(1);
-
-    display.drawRFrame(31, 14, 67, 36, 5);
-    display.drawXBM(34, 17, 19, 20, image_power_bits);
-    display.drawXBM(55, 17, 19, 20, image_play_bits);
-    display.drawXBM(76, 17, 19, 20, image_off_bits);
-
-    display.drawXBM(36, 39, 10, 8, image_Pin_back_arrow_bits);
-
-    display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(49, 46, "Back");
-    display.sendBuffer();
+    detachCallback();
 
     btnAction.attachClick(shutdown_now);
     btnAction.attachDoubleClick(restart_now);
@@ -362,6 +372,29 @@ void showActionGUI() {
         initMenuButton();
         drawMenu();
     });
+
+    while(true) {
+        display.clearBuffer();
+        display.sendBuffer();
+
+        display.setBitmapMode(1);
+
+        display.drawRFrame(31, 14, 67, 36, 5);
+        display.drawXBM(34, 17, 19, 20, image_power_bits);
+        display.drawXBM(55, 17, 19, 20, image_play_bits);
+        display.drawXBM(76, 17, 19, 20, image_off_bits);
+
+        display.drawXBM(36, 39, 10, 8, image_Pin_back_arrow_bits);
+
+        display.setFont(u8g2_font_4x6_tr);
+        display.drawStr(49, 46, "Back");
+        display.sendBuffer();
+
+        esp_task_wdt_reset();
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+
+        btnAction.tick();
+    }
 }
 
 float menuYOffset = 0.0f;
@@ -960,7 +993,7 @@ void setup() {
     Wire.begin(SDA_PIN, SCL_PIN, 800000);
     Wire.setTimeOut(50);
     Wire.setClock(800000);
-    
+
     eep.begin(); // Ensure EEPROM is initialized
 
     display.setBusClock(800000);
@@ -1147,6 +1180,7 @@ void setup() {
                                 Serial.println("  READ EEPROM  - Raw hex dump (e.g., read EEPROM 0 32)");
                                 Serial.println("  WRITE EEPROM - Raw byte write (e.g., write EEPROM 0 48 65)");
                                 Serial.println("  FLASH EEPROM - Erase entire EEPROM chip");
+                                Serial.println("  I2CSCAN      - Scan the working I2C slave");
                                 Serial.println("  EXIT         - Return to Main OS Menu");
                             }
                             else if (inputBuffer.startsWith("read EEPROM") || inputBuffer.startsWith("read eeprom") || inputBuffer.startsWith("READ EEPROM")) {
@@ -1343,6 +1377,37 @@ void setup() {
                                 display.clearBuffer();
                                 display.drawStr(0, 10, "EEPROM Flash OK");
                                 display.sendBuffer();
+                            }
+                            else if (inputBuffer.equalsIgnoreCase("i2cscan")) {
+                                // Scan the I2C bus
+                                Serial.println("Scanning I2C bus...");
+                                display.clearBuffer();
+                                display.drawStr(0, 10, "Scanning I2C bus...");
+                                display.sendBuffer();
+
+                                byte error, address;
+                                int nDevices;
+
+                                for(address = 1; address < 127; address++ ) {
+                                    Wire.beginTransmission(address);
+                                    error = Wire.endTransmission();
+
+                                    if(error == 0) {
+                                        Serial.print("I2C slave found at address 0x");
+                                        if (address < 16) Serial.print("0");
+                                        Serial.print(address, HEX);
+                                        Serial.println("  !");
+
+                                        nDevices++;
+                                    }
+                                    else if(error == 4) {
+                                        Serial.print("Unknown error at address 0x");
+                                        if (address < 16) Serial.print("0");
+                                        Serial.println(address, HEX);
+                                    }
+                                }
+
+                                nDevices ? Serial.print(nDevices, DEC) : Serial.print("0. Done\n");
                             }
                             else if (inputBuffer.equalsIgnoreCase("exit")) {
                                 Serial.println("Exiting DOS environment...");

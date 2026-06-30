@@ -16,7 +16,14 @@ extern void drawMenu();
 inline void safe_restart() {
     boot_mode = BOOT_NORMAL;
 
-    display.setContrast(0);
+    display.clearBuffer();
+    display.setFontMode(1);
+    display.setBitmapMode(1);
+    display.setFont(u8g2_font_4x6_tr);
+    display.drawStr(40, 35, "Rebooting...");
+    display.sendBuffer();
+
+    display.setContrast(50); // Minimum contrast
     delay(50);
 
     stopAllService();

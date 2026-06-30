@@ -15,6 +15,7 @@
 #include "app/Essential/Stopwatch.h"
 #include "app/Essential/StoreManager.h"
 #include "app/Essential/Timer.h"
+#include "app/KeyboardEmu/KeyboardEmu.h"
 #include "app/Game/Doom/GameClient_Doom.h"
 #include "app/Game/Minecraft/GameClient.h"
 #include "app/Game/StardewValleyCopy/GameClient_svc.h"

@@ -3,6 +3,7 @@
 #include <OneButton.h>
 #include <U8g2lib.h>
 #include <WiFi.h>
+#include <esp_task_wdt.h>
 
 #include "component/service.h"
 #include "icons/icon.h"
@@ -24,18 +25,21 @@ inline void show_eme_restart() {
 
     display.clearBuffer();
 
-    display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(2, 23, "Click OK to immediately restart");
+    display.setFontMode(1);
+    display.setBitmapMode(1);
 
-    display.drawRBox(36, 30, 23, 9, 3);
-    display.drawRFrame(63, 30, 33, 9, 3);
-
-    display.setDrawColor(2);
-    display.drawStr(43, 37, "OK");
-    display.drawStr(68, 37, "CANCEL");
-
+    display.drawFrame(2, 29, 125, 6); // Outline
+    
     display.sendBuffer();
 
-    btnOK.attachClick([]() { eme_restart_run(); });
-    btnOK.attachLongPressStart([]() { startService(); WiFi.mode(WIFI_STA); drawMenu(); });
+    for (int i=0; i<125; i++) {
+        display.drawBox(2, 29, 125, 6); // Inside
+        display.sendBuffer();
+        
+        vTaskDelay(5 / portTICK_PERIOD_MS);
+        esp_task_wdt_reset();
+    }
+
+
+    eme_restart_run(); // Just run no matter what
 }

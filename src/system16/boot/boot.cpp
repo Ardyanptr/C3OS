@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "component/hardware/eeprom.h"
+#include "component/rp2040link.h"
 #include "component/queuer.h"
 #include "component/ui_enhancements.h"
 #include "component/wifiservice.h"
@@ -735,6 +736,12 @@ void full_boot() {
         lnx_log("i2c: no eeprom found at 0x50", 0.32f);
     }
 
+    if (RP2040Link::detect()) {
+        lnx_log("rp2040: coprocessor found on I2C", 0.35f);
+    } else {
+        lnx_log("rp2040: not detected", 0.35f);
+    }
+
     lnx_log("input: OneButton v2.0.0 driver", 0.35f);
     lnx_log("Mounting LittleFS...", 0.40f);
     if (LittleFS.begin(true)) {
@@ -968,6 +975,14 @@ void safe_boot() {
         SB_BEGIN("ESP8266 start cmd");
         sendCommand("32:start");
         SB_END("sent");
+    }
+
+    // ── RP2040 coprocessor ──────────────────────────────────
+    {
+        SB_BEGIN("RP2040 UART");
+        bool found = RP2040Link::detect();
+        SB_END(found ? "OK" : "N/A");
+        if (found) SB_NOTE("Found on UART");
     }
 
     // ── Start all services ───────────────────────────────────

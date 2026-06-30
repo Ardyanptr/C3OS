@@ -33,6 +33,7 @@ extern void proceedUpdate();
 extern void startRadarApp();
 extern void runPrismLauncher();
 extern void runCrashManager();
+extern void runKeyboardEmu();
 
 extern void non_set();
 
@@ -60,7 +61,7 @@ extern void non_set();
     X(runBenchMyESP)           \
     X(runGameClient_SWT)       \
     X(runGameClient_SVC)       \
-    X(non_set)                 \
+    X(runKeyboardEmu)          \
     X(runC3Burner)             \
     X(runTelnet)               \
     X(runGameClient_DOOM)      \
