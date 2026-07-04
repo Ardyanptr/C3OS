@@ -275,9 +275,6 @@ void showShortcutGUI() {
             vTaskDelay(5);
             yield();
         }
-
-        initMenuButton();
-        drawMenu();
     });
 
     btnOK.attachDoubleClick([]() {
@@ -304,6 +301,9 @@ void showShortcutGUI() {
 
         display.drawStr(9, 62, "1: 1, 2: 2, 3: 3, L: 4");
         display.sendBuffer();
+
+        btnOK.tick();
+        btnAction.tick();
 
         esp_task_wdt_reset();
         vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -359,23 +359,17 @@ void showActionGUI() {
 
     btnAction.attachClick(shutdown_now);
     btnAction.attachDoubleClick(restart_now);
-    btnAction.attachMultiClick(syncESP8266);
 
-    btnAction.attachLongPressStart([]() {
+    btnAction.attachLongPressStop([]() {
         powerNotifyActivity();
         lastActive = millis();
         gPower.notifyActivity();
-        
-        // Wait for button release
-        while(digitalRead(BUTTON_ACTION) == LOW) { delay(10); esp_task_wdt_reset(); }
-
         initMenuButton();
         drawMenu();
     });
 
     while(true) {
         display.clearBuffer();
-        display.sendBuffer();
 
         display.setBitmapMode(1);
 
