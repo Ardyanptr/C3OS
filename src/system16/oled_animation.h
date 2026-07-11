@@ -18,18 +18,20 @@ inline void fadeInOLED() {
     display.clearBuffer();
     display.sendBuffer();
 
-    for (int c = 0; c <= Settings::instance->get().oledContrast; c += 3) {
+    int step = 6;
+    for (int c = 0; c <= Settings::instance->get().oledContrast; c += step) {
         display.setContrast(c);
-        delay(5);
+        delay(2);
     }
 
     setting.loadSettings();
 }
 
 inline void fadeOutOLED() {
-    for (int c = 180; c >= 0; c -= 3) {
+    int step = 6;
+    for (int c = 180; c >= 0; c -= step) {
         display.setContrast(c);
-        delay(5);
+        delay(2);
     }
 
     setting.loadSettings();

@@ -30,7 +30,7 @@ struct FileItem {
 enum FM_Mode { MODE_DRIVES, MODE_FILES, MODE_ESP8266_FILES };
 static FM_Mode fmMode = MODE_DRIVES;
 
-static char currentPath[64] = "/";
+static char currentPath[128] = "/";
 static int  cursor           = 0;
 static bool exitManager      = false;
 static int  itemCount        = 0;
@@ -252,7 +252,8 @@ static void drawUI() {
 
     if (itemCount > VISIBLE_LINES) {
         int barH = (VISIBLE_LINES * 44) / itemCount;
-        int barY = 12 + (scrollOffset * 44) / (itemCount - VISIBLE_LINES);
+        int divisor = itemCount - VISIBLE_LINES;
+        int barY = 12 + (scrollOffset * 44) / (divisor > 0 ? divisor : 1);
         display.drawBox(126, barY, 2, barH);
     }
 

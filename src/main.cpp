@@ -88,6 +88,7 @@ uint8_t anrSelect = 0;
 bool appRunning = false;
 bool anrActive = false;
 bool systemUIActive = true;
+bool isActionActive = true;
 
 int currentApp = -1;
 int anrApp = -1;
@@ -245,33 +246,37 @@ void runGameClient_DOOM() {
 }
 
 void showShortcutGUI() {
-    isGUIActive = true;
-
     detachCallback();
+
+    isGUIActive = true;
 
     btnOK.attachClick([]() {
         isGUIActive = false;
-        
-        display.clearBuffer();
-
-        display.setFontMode(1);
-        display.setBitmapMode(1);
-
-        display.drawBox(0, 32, 55, 2);
-
-        display.drawRFrame(54, 28, 18, 10, 3);
-        display.drawRBox(54, 28, 13, 10, 1);
-
-        display.setFont(u8g2_font_4x6_tr);
-        display.drawStr(34, 50, "Upload firmware");
-        display.drawStr(42, 57, "to proceed.");
-
-        display.sendBuffer();
 
         RP2040Link::sendCommand(RP2040::System::DFU);
 
         while (true) {
             esp_task_wdt_reset();
+
+            display.clearBuffer();
+
+            display.setFontMode(1);
+            display.setBitmapMode(1);
+
+            display.drawBox(0, 32, 55, 2);
+
+            display.drawRFrame(54, 28, 18, 10, 3);
+            display.drawRBox(54, 28, 13, 10, 1);
+
+            display.setFont(u8g2_font_4x6_tr);
+            display.drawStr(34, 50, "Upload firmware");
+            display.drawStr(42, 57, "to proceed.");
+
+            display.sendBuffer();
+
+            btnOK.tick();
+            btnAction.tick();
+
             vTaskDelay(5);
             yield();
         }
@@ -288,7 +293,7 @@ void showShortcutGUI() {
         drawMenu();
     });
 
-    while(isGUIActive) {
+    while (isGUIActive) {
         display.clearBuffer();
         display.setFontMode(1);
         display.setBitmapMode(1);
@@ -355,20 +360,24 @@ void syncESP8266() {
 }
 
 void showActionGUI() {
+    isActionActive = true;
     detachCallback();
 
     btnAction.attachClick(shutdown_now);
     btnAction.attachDoubleClick(restart_now);
 
-    btnAction.attachLongPressStop([]() {
+    btnAction.attachLongPressStart([]() {
         powerNotifyActivity();
         lastActive = millis();
         gPower.notifyActivity();
+
+        isActionActive = false;
+
         initMenuButton();
         drawMenu();
     });
 
-    while(true) {
+    while(isActionActive) {
         display.clearBuffer();
 
         display.setBitmapMode(1);
@@ -384,10 +393,11 @@ void showActionGUI() {
         display.drawStr(49, 46, "Back");
         display.sendBuffer();
 
+        btnAction.tick();
+        btnOK.tick();
+
         esp_task_wdt_reset();
         vTaskDelay(10 / portTICK_PERIOD_MS);
-
-        btnAction.tick();
     }
 }
 
@@ -696,7 +706,7 @@ void initMenuButton() {
         lastActive = millis();
         gPower.notifyActivity();
         
-        showTaskManager();
+        showShortcutGUI();
         
         initMenuButton();
         drawMenu();
@@ -983,7 +993,7 @@ void setup() {
     esp_reset_reason_t reason = esp_reset_reason();
     Serial.printf("Reset reason: %d\n", reason);
 
-    delay(500);
+    delay(50);
     Wire.begin(SDA_PIN, SCL_PIN, 800000);
     Wire.setTimeOut(50);
     Wire.setClock(800000);
@@ -1028,7 +1038,7 @@ void setup() {
     }
 
     BootloaderUI bootloader(&display, &btnUp, &btnDown, &btnOK);
-    BootMode selectedMode = bootloader.showMenu(3);
+    BootMode selectedMode = bootloader.showMenu(1);
 
     switch (selectedMode) {
         case BL_BOOT_NORMAL:
@@ -1084,6 +1094,149 @@ void setup() {
                                 Serial.print("\e[H\e[J"); 
                                 
                                 display.clearBuffer();
+                            }else if (inputBuffer.equalsIgnoreCase("stress")) {
+                                Serial.println("\n=== C3OS STRESS MODE START ===\n");
+
+                                int memScore = 0;
+                                int fsScore = 0;
+                                int uiScore = 0;
+
+                                unsigned long startTime = millis();
+
+                                // =========================
+                                // 1. MEMORY STRESS
+                                // =========================
+                                Serial.println("[1/3] MEMORY STRESS START");
+
+                                std::vector<char*> blocks;
+
+                                for (int i = 0; i < 3000; i++) {
+                                    char* p = (char*)malloc(1024);
+                                    if (!p) {
+                                        Serial.println("[MEM] ALLOCATION FAILED!");
+                                        break;
+                                    }
+
+                                    memset(p, 0xAA, 1024);
+                                    blocks.push_back(p);
+
+                                    if (i % 100 == 0) {
+                                        Serial.printf("[MEM] Allocated: %d KB | Free Heap: %d\n",
+                                                    i,
+                                                    ESP.getFreeHeap());
+                                    }
+
+                                    esp_task_wdt_reset();
+                                    delay(1);
+                                }
+
+                                memScore = blocks.size() / 30; // simple scoring
+                                Serial.printf("[MEM] DONE - Blocks: %d | Score: %d/100\n\n",
+                                            blocks.size(), memScore);
+
+
+                                // =========================
+                                // 2. FILESYSTEM STRESS
+                                // =========================
+                                Serial.println("[2/3] FILESYSTEM STRESS START");
+
+                                int fsSuccess = 0;
+
+                                for (int i = 0; i < 200; i++) {
+                                    String path = "/stress_" + String(i) + ".txt";
+
+                                    File f = LittleFS.open(path, "w");
+
+                                    if (f) {
+                                        f.print("C3OS_STRESS_TEST_" + String(i));
+                                        f.close();
+                                        fsSuccess++;
+
+                                        if (i % 20 == 0) {
+                                            Serial.printf("[FS] Written file %d\n", i);
+                                        }
+                                    } else {
+                                        Serial.printf("[FS] WRITE FAIL at %d\n", i);
+                                    }
+
+                                    esp_task_wdt_reset();
+                                }
+
+                                fsScore = (fsSuccess * 100) / 200;
+
+                                Serial.printf("[FS] DONE - Success: %d/200 | Score: %d/100\n\n",
+                                            fsSuccess, fsScore);
+
+
+                                // =========================
+                                // 3. DISPLAY STRESS
+                                // =========================
+                                Serial.println("[3/3] DISPLAY STRESS START");
+
+                                for (int i = 0; i < 80; i++) {
+
+                                    display.clearBuffer();
+
+                                    for (int x = 0; x < 128; x++) {
+                                        display.drawLine(0, x, 127, 127 - x);
+                                    }
+
+                                    display.setFont(u8g2_font_5x7_tr);
+                                    display.drawStr(10, 10, "C3OS STRESS MODE");
+
+                                    display.drawStr(10, 25, ("Frame: " + String(i)).c_str());
+
+                                    display.sendBuffer();
+
+                                    if (i % 10 == 0) {
+                                        Serial.printf("[UI] Frame %d rendered\n", i);
+                                    }
+
+                                    uiScore += 1;
+
+                                    delay(30);
+                                    esp_task_wdt_reset();
+                                }
+
+                                uiScore = uiScore / 1; // normalize
+
+                                Serial.println("\n[UI] DONE\n");
+
+
+                                // =========================
+                                // CLEANUP
+                                // =========================
+                                Serial.println("[CLEANUP] Freeing memory...");
+                                for (auto b : blocks) free(b);
+
+                                // =========================
+                                // SCORE CALC
+                                // =========================
+                                unsigned long endTime = millis();
+                                unsigned long duration = endTime - startTime;
+
+                                int finalScore = (memScore + fsScore + uiScore) / 3;
+
+                                Serial.println("\n==============================");
+                                Serial.println("   C3OS STRESS TEST RESULT");
+                                Serial.println("==============================");
+
+                                Serial.printf("Memory Score : %d/100\n", memScore);
+                                Serial.printf("FS Score     : %d/100\n", fsScore);
+                                Serial.printf("UI Score     : %d/100\n", uiScore);
+                                Serial.printf("Duration     : %lu ms\n", duration);
+
+                                Serial.println("------------------------------");
+
+                                if (finalScore > 80) {
+                                    Serial.printf("FINAL SCORE  : %d/100\n", finalScore);
+                                } else if (finalScore > 50) {
+                                    Serial.printf("FINAL SCORE  : %d/100\n", finalScore);
+                                } else {
+                                    Serial.printf("FINAL SCORE  : %d/100\n", finalScore);
+                                }
+
+                                Serial.println("==============================\n");
                             }
                             else if (inputBuffer.equalsIgnoreCase("reboot")) {
                                 display.clearBuffer();

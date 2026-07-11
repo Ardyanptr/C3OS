@@ -40,26 +40,8 @@ static void drawBootUI() {
     display.clearBuffer();
     display.setDrawColor(1);
 
-    // Breathing centered C3OS logo
-    float breath = (sin(millis() / 600.0) + 1.0) / 2.0;
-    int logoSize = 22 + (int)(breath * 4);
-    int logoX = 64 - logoSize / 2;
-    int logoY = 22 - logoSize / 2;
-    display.drawXBM(logoX, logoY, logoSize, logoSize, image_C3_bits);
+    display.drawXBM(58, 20, 11, 11, image_C3_bits);
 
-    // Rotating circular progress ring
-    float angle = (millis() / 800.0) * 6.2832;
-    float ringRadius = 18.0f;
-    int cx = 64, cy = 22;
-    int arcPoints = (int)(bootProgress * 20);
-    for (int i = 0; i < arcPoints; i++) {
-        float a = angle + (i / 20.0f) * 6.2832f;
-        int px = cx + (int)(cos(a) * ringRadius);
-        int py = cy + (int)(sin(a) * ringRadius);
-        display.drawPixel(px, py);
-    }
-
-    // Clean thin progress bar at bottom
     display.drawFrame(4, 56, 120, 6);
     int barWidth = (int)(bootProgress * 118);
     if (barWidth > 0) {
@@ -527,11 +509,8 @@ void fast_boot() {
 
             display.drawHLine(64 - (lineWidth / 2), 52, lineWidth);
 
-            display.drawPixel(64 - (lineWidth / 2) - 3, 52);
-            display.drawPixel(64 + (lineWidth / 2) + 3, 52);
-
             display.sendBuffer();
-            delay(15);
+            delay(5);
 
             if (target - visualP < 0.005) {
                 visualP = target;
@@ -565,7 +544,7 @@ void fast_boot() {
         display.setFont(u8g2_font_4x6_tr);
         display.drawStr(15, 55, "Charge to continue");
         display.sendBuffer();
-        delay(2000);
+        delay(500);
     }
 
     Serial.println("[BOOT] Mounting LittleFS...");
@@ -620,22 +599,12 @@ void fast_boot() {
                 break;
             }
 
-            delay(320);
+            delay(50);
         }
     }
 
     display.sendBuffer();
     boot_count = 0;
-
-    {
-        bool hasSettings = (readEEPROM(SETTINGS_MARKER_ADDR) == SETTINGS_MARKER_VAL);
-        display.setFont(u8g2_font_6x10_tr);
-        display.clearBuffer();
-        display.drawStr(0, 15, "EEPROM: 32KB (AT24C256)");
-        display.drawStr(0, 30, hasSettings ? "Settings: SAVED" : "Settings: EMPTY");
-        display.sendBuffer();
-        delay(1000);
-    }
 
     showLockscreen(true);
 }
@@ -702,7 +671,6 @@ void full_boot() {
         snprintf(buf, sizeof(buf), "[%8.6f] %s", millis() / 1000.0, msg);
         if (p >= 0.0f) bootProgress = p;
         sb_push(buf);
-        delay(10);
         esp_task_wdt_reset();
     };
 
@@ -801,19 +769,7 @@ void full_boot() {
     esp_task_wdt_reset();  // Reset watchdog after starting services
 
     lnx_log("C3OS-init: boot finished", 1.0f);
-    esp_task_wdt_reset();  // Reset watchdog before final delay
-    delay(500);
-
-    {
-        bool hasSettings = (readEEPROM(SETTINGS_MARKER_ADDR) == SETTINGS_MARKER_VAL);
-        display.clearBuffer();
-        display.setFont(u8g2_font_6x10_tr);
-        display.drawStr(0, 15, "EEPROM: 32KB (AT24C256)");
-        display.drawStr(0, 30, hasSettings ? "Settings: SAVED" : "Settings: EMPTY");
-        display.drawStr(0, 50, "Hold ACTION for BIOS");
-        display.sendBuffer();
-        delay(1000);
-    }
+    esp_task_wdt_reset();
 
     boot_count = 0;
     UX::TransitionEffects::fadeOut();
@@ -996,7 +952,7 @@ void safe_boot() {
     SB_NOTE("Heap free=%luB", (unsigned long)ESP.getFreeHeap());
     sb_push("-- safe boot done --");
 
-    delay(600);  // let user read the last lines
+    delay(200);
 
     drawMenu();
 }

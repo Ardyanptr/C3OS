@@ -28,6 +28,7 @@ portMUX_TYPE btnMux = portMUX_INITIALIZER_UNLOCKED;
 bool halt = true;
 
 void lua_not_respond() {
+    display.clearBuffer();
     display.setFontMode(1);
     display.setBitmapMode(1);
     display.drawRFrame(23, 12, 82, 39, 5);
@@ -133,6 +134,17 @@ int l_c3_drawBox(lua_State *L) {
     return 0;
 }
 
+int l_c3_drawRBox(lua_State *L) {
+    int x = luaL_checkinteger(L, 1);
+    int y = luaL_checkinteger(L, 2);
+    int w = luaL_checkinteger(L, 3);
+    int h = luaL_checkinteger(L, 4);
+    int r = luaL_checkinteger(L, 5);
+
+    display.drawRBox(x, y, w, h, r);
+    return 0;
+}
+
 int l_c3_drawRFrame(lua_State *L) {
     int x = luaL_checkinteger(L, 1);
     int y = luaL_checkinteger(L, 2);
@@ -217,6 +229,19 @@ int l_c3_print(lua_State *L) {
     const char *msg = luaL_checkstring(L, 1);
     Serial.println(msg);
     return 0;
+}
+
+int l_c3_map(lua_State *L) {
+    int value = luaL_checkinteger(L, 1);
+    int fromLow = luaL_checkinteger(L, 2);
+    int fromHigh = luaL_checkinteger(L, 3);
+    int toLow = luaL_checkinteger(L, 4);
+    int toHigh = luaL_checkinteger(L, 5);
+
+    int mappedValue = map(value, fromLow, fromHigh, toLow, toHigh);
+
+    lua_pushinteger(L, mappedValue);
+    return 1;
 }
 
 int l_c3_get_into_powersave(lua_State *L) {
@@ -441,9 +466,21 @@ void runLuaScript(const char *path) {
     if (luaRunning) return;
     luaRunning = true;
 
+    bool c3_ready = LittleFS.begin();
+
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
+    lua_newtable(L);
+    
     lua_checkstack(L, 1000);
+    
+    lua_pushboolean(L, c3_ready);
+    lua_setfield(L, -2, "fs");
+
+    lua_pushinteger(L, ESP.getFreeHeap());
+    lua_setfield(L, -2, "heap");
+
+    lua_setglobal(L, "C3");
 
     lua_register(L, "c3_print", l_c3_display_print);
     lua_register(L, "c3_cls", l_c3_display_cls);
@@ -451,12 +488,14 @@ void runLuaScript(const char *path) {
     lua_register(L, "c3_draw_frame", l_c3_drawFrame);
     lua_register(L, "c3_drawRFrame", l_c3_drawRFrame);
     lua_register(L, "c3_draw_box", l_c3_drawBox);
+    lua_register(L, "c3_drawRBox", l_c3_drawRBox);
     lua_register(L, "c3_draw_line", l_c3_drawLine);
     lua_register(L, "c3_draw_hline", l_c3_drawHLine);
     lua_register(L, "c3_set_font", l_c3_setFont);
     lua_register(L, "c3_drawBitmap", l_c3_drawBitmap);
 
     lua_register(L, "print", l_c3_print);
+    lua_register(L, "map", l_c3_map);
 
     lua_register(L, "c3_get_into_powersave", l_c3_get_into_powersave);
     lua_register(L, "c3_get_into_performance", l_c3_get_into_performance);

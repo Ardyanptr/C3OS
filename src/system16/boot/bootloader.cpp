@@ -15,6 +15,7 @@ BootloaderUI::BootloaderUI(U8G2 *disp, OneButton *up, OneButton *down, OneButton
 
 BootMode BootloaderUI::showMenu(uint16_t autoBootSeconds) {
     startTime = millis();
+    autoBootSec = autoBootSeconds;
     menuActive = true;
     selectionMade = false;
 
@@ -82,7 +83,7 @@ void BootloaderUI::updateUI() {
     drawStaticUI();
     drawArrow();
     
-    float elapsed = (float)(millis() - startTime) / 5000.0f; // 5s timeout
+    float elapsed = (float)(millis() - startTime) / (autoBootSec * 1000.0f);
     drawProgress(constrain(1.0f - elapsed, 0.0f, 1.0f));
     
     display->sendBuffer();

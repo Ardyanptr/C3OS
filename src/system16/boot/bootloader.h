@@ -25,6 +25,7 @@ class BootloaderUI {
     float cursorCurrentY;
     float cursorTargetY;
     unsigned long startTime;
+    uint16_t autoBootSec;
     bool menuActive;
     bool selectionMade;
 
