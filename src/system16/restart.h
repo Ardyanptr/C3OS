@@ -6,7 +6,6 @@
 
 #include "component/service.h"
 #include "emergency/eme_restart.h"
-#include "system16/esp826.h"
 #include "system16/state.h"
 
 #include "config/config.h"

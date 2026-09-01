@@ -11,11 +11,11 @@ int SystemRescue::_menuIdx = 0;
 bool SystemRescue::_isRunning = true;
 
 const char* rescueLabels[] = {
-    "1. Fix My Device",
+    "1. Quick Check",
     "2. Clean Junk Files",
     "3. Factory Reset",
     "4. Test Buttons/Screen",
-    "5. Restart Normally"
+    "5. Restart"
 };
 
 void SystemRescue::run(U8G2* display, OneButton* up, OneButton* down, OneButton* ok) {

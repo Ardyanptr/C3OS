@@ -1,3 +1,8 @@
+/* This project was created by Ardyan Ardasyah @ 24 / 03 / 2025
+ * Any changes, please use the commit and push to main @ GitHub
+ * Current main.cpp version: 1.0.10-E1B
+ */
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -1636,7 +1641,7 @@ void loop() {
         isOnSleepMode = true;
     }
 
-    if (WiFi.getMode() == WIFI_AP || WiFi.softAPgetStationNum() > 0) dnsServer.processNextRequest();
+    if (WiFi.getMode() == WIFI_AP_STA || WiFi.softAPgetStationNum() > 0) dnsServer.processNextRequest();
 
     server.handleClient();
     processSerialInput();
