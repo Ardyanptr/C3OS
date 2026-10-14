@@ -7,3 +7,4 @@
 #include "config/config.h"
 
 void runLuaScript(const char* path);
+void runLuaScriptArgs(const char* path, const String& cmdline);

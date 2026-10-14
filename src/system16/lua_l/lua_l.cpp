@@ -461,25 +461,25 @@ int l_c3_get_weather(lua_State *L) {
     return 0;
 }
 
-// Main Handler
-void runLuaScript(const char *path) {
-    if (luaRunning) return;
-    luaRunning = true;
+int l_c3_get_uptime(lua_State *L) {
+    lua_pushinteger(L, millis());
+    return 1;
+}
 
-    bool c3_ready = LittleFS.begin();
+int l_c3_get_cpu(lua_State *L) {
+    lua_pushinteger(L, getCpuFrequencyMhz());
+    return 1;
+}
 
+static lua_State* luaCreateState() {
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
     lua_newtable(L);
-    
     lua_checkstack(L, 1000);
-    
-    lua_pushboolean(L, c3_ready);
+    lua_pushboolean(L, true);
     lua_setfield(L, -2, "fs");
-
     lua_pushinteger(L, ESP.getFreeHeap());
     lua_setfield(L, -2, "heap");
-
     lua_setglobal(L, "C3");
 
     lua_register(L, "c3_print", l_c3_display_print);
@@ -493,25 +493,31 @@ void runLuaScript(const char *path) {
     lua_register(L, "c3_draw_hline", l_c3_drawHLine);
     lua_register(L, "c3_set_font", l_c3_setFont);
     lua_register(L, "c3_drawBitmap", l_c3_drawBitmap);
-
     lua_register(L, "print", l_c3_print);
     lua_register(L, "map", l_c3_map);
-
     lua_register(L, "c3_get_into_powersave", l_c3_get_into_powersave);
     lua_register(L, "c3_get_into_performance", l_c3_get_into_performance);
     lua_register(L, "c3_set_cpu_clock", l_c3_set_cpu_clock);
-
     lua_register(L, "c3_get_heap_kb", l_c3_get_heap_kb);
     lua_register(L, "c3_get_heap", l_c3_get_heap);
     lua_register(L, "c3_sleep", l_c3_sleep);
     lua_register(L, "c3_btn", l_c3_btn);
-
     lua_register(L, "c3_file_exists", l_c3_file_exists);
     lua_register(L, "c3_file_read", l_c3_file_read);
     lua_register(L, "c3_file_write", l_c3_file_write);
-
     lua_register(L, "c3_http_get", l_c3_http_get);
     lua_register(L, "c3_get_weather", l_c3_get_weather);
+    lua_register(L, "c3_get_uptime", l_c3_get_uptime);
+    lua_register(L, "c3_get_cpu", l_c3_get_cpu);
+    return L;
+}
+
+// Main Handler
+void runLuaScript(const char *path) {
+    if (luaRunning) return;
+    luaRunning = true;
+
+    lua_State *L = luaCreateState();
 
     String luaCode = swapPull(99);
 
@@ -620,4 +626,67 @@ void runLuaScript(const char *path) {
     luaRunning = false;
 
     delay(100);
+}
+
+void runLuaScriptArgs(const char *path, const String &cmdline) {
+    if (luaRunning) return;
+    luaRunning = true;
+
+    lua_State *L = luaCreateState();
+
+    lua_newtable(L);
+    lua_pushstring(L, path);
+    lua_rawseti(L, -2, 0);
+
+    int argIdx = 1;
+    int pos = 0;
+    int len = cmdline.length();
+    while (pos < len && argIdx <= 16) {
+        while (pos < len && cmdline[pos] == ' ') pos++;
+        if (pos >= len) break;
+        int endPos = pos;
+        while (endPos < len && cmdline[endPos] != ' ') endPos++;
+        String tok = cmdline.substring(pos, endPos);
+        lua_pushstring(L, tok.c_str());
+        lua_rawseti(L, -2, argIdx);
+        argIdx++;
+        pos = endPos + 1;
+    }
+    lua_setglobal(L, "arg");
+
+    char fixedPath[128];
+    if (path[0] != '/')
+        snprintf(fixedPath, sizeof(fixedPath), "/%s", path);
+    else
+        strncpy(fixedPath, path, sizeof(fixedPath) - 1);
+
+    File file = LittleFS.open(fixedPath, "r");
+    if (!file) {
+        Serial.printf("[DOS/LUA] Plugin not found: %s\n", fixedPath);
+        lua_close(L);
+        luaRunning = false;
+        return;
+    }
+
+    size_t fileLen = file.size();
+    char *buf = new char[fileLen + 1];
+    file.readBytes(buf, fileLen);
+    buf[fileLen] = 0;
+    file.close();
+
+    int loadStatus = luaL_loadbuffer(L, buf, fileLen, fixedPath);
+    delete[] buf;
+
+    if (loadStatus == LUA_OK) {
+        if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+            String err = lua_tostring(L, -1);
+            Serial.printf("[DOS/LUA] Error: %s\n", err.c_str());
+        }
+    } else {
+        String err = lua_tostring(L, -1);
+        Serial.printf("[DOS/LUA] Load error: %s\n", err.c_str());
+    }
+
+    lua_close(L);
+    luaRunning = false;
 }

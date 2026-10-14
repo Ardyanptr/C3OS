@@ -71,7 +71,8 @@ extern void non_set();
     X(proceedUpdate)           \
     X(startRadarApp)           \
     X(runPrismLauncher)        \
-    X(runCrashManager)
+    X(runCrashManager)         \
+    X(non_set)
 
 #define X(name) {#name, name, 0, 20 * 1024, true},
 AppDesc appTable[] = {APP_LIST};

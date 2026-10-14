@@ -24,6 +24,7 @@
 #include "system16/boot/bootloader.h"
 #include "system16/crash_handler.h"
 #include "system16/loader.h"
+#include "system16/lua_l/dos_plugins.h"
 #include "system16/power.h"
 #include "system16/state_manager.h"
 #include "system16/update.h"
@@ -196,7 +197,8 @@ const char* menuItems[] = {
     "Factory Reset", "Check Integrity", "Online Story",   "Heap Monitor",  "Stopwatch",
     "BenchMyESP",    "Minecraft",       "Stardew Valley", "Keyboard Emu",  "C3 Burner",
     "WiFi Telnet",   "Doom GL",         "File Manager",   "Store Manager", "Timer",
-    "Update",        "Radar Maker",     "Prism Launcher", "Crash Manager"};
+    "Update",        "Radar Maker",     "Prism Launcher", "Crash Manager", "DummyApp"
+};
 
 const int menuCount = sizeof(menuItems) / sizeof(menuItems[0]);
 const int visibleItem = sysConfig.visible_items;
@@ -1073,6 +1075,8 @@ void setup() {
             Serial.println("Copyright (C) 2026 Ardyan");
             Serial.print("A:\\>");
 
+            DOSPlugins::load();
+
             String inputBuffer = "";
 
             while(true) {
@@ -1108,9 +1112,6 @@ void setup() {
 
                                 unsigned long startTime = millis();
 
-                                // =========================
-                                // 1. MEMORY STRESS
-                                // =========================
                                 Serial.println("[1/3] MEMORY STRESS START");
 
                                 std::vector<char*> blocks;
@@ -1333,7 +1334,13 @@ void setup() {
                                 Serial.println("  WRITE EEPROM - Raw byte write (e.g., write EEPROM 0 48 65)");
                                 Serial.println("  FLASH EEPROM - Erase entire EEPROM chip");
                                 Serial.println("  I2CSCAN      - Scan the working I2C slave");
+                                Serial.println("  PLUGINS      - List installed Lua plugins");
                                 Serial.println("  EXIT         - Return to Main OS Menu");
+                                Serial.println("\nLua plugins:");
+                                DOSPlugins::list();
+                            }
+                            else if (inputBuffer.equalsIgnoreCase("plugins")) {
+                                DOSPlugins::list();
                             }
                             else if (inputBuffer.startsWith("read EEPROM") || inputBuffer.startsWith("read eeprom") || inputBuffer.startsWith("READ EEPROM")) {
                                 String rest = inputBuffer.substring(11);
@@ -1566,10 +1573,12 @@ void setup() {
                                 break;
                             }
                             else {
-                                Serial.println("Bad command or file name");
-                                
-                                display.clearBuffer();
-                                display.drawStr(0, 10, "Bad command");
+                                if (!DOSPlugins::run(inputBuffer)) {
+                                    Serial.println("Bad command or file name");
+
+                                    display.clearBuffer();
+                                    display.drawStr(0, 10, "Bad command");
+                                }
                             }
                         }
 
