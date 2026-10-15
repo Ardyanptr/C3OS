@@ -1,3 +1,5 @@
+#pragma once
+
 #include <DFRobot_VL53L0X.h>
 #include <DNSServer.h>
 #include <EEPROM.h>

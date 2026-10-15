@@ -6,4 +6,3 @@
 #include "component/panic.h"
 #include "component/regis.h"
 #include "component/service.h"
-#include "component/supervisor.h"

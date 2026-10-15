@@ -4,7 +4,6 @@
 #include "LittleFS.h"
 #include "config/config.h"
 #include "config/var_declare.h"
-// #include "include/BLEAppLib.h"
 #include "include/ComponentLib.h"
 #include "include/CoreLib.h"
 #include "include/EssentialAppLib.h"

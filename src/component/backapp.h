@@ -13,7 +13,6 @@ extern SemaphoreHandle_t i2cMutex;
 
 void BA_CPUTemp(void* param);
 void BA_WiFi(void* param);
-void BA_EEPROM(void* param);
 void BA_LED(void* param);
 void BA_HEAP_ALLOCATOR(void* param);
 void BA_EME_RESTART_COMBINATION(void* param);

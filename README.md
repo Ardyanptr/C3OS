@@ -64,4 +64,15 @@ Provides a unified output layer that mirrors information across the OLED display
 
 C3OS is functional and actively maintained. The current implementation reflects a deliberate architectural decision to prioritize speed and direct hardware access over abstraction, and early testing has shown encouraging performance and stability on both target boards. That said, the project is still evolving, and users should expect occasional bugs as new features, commands, and hardware support are added in future updates.
 
+---
+
+## Documentation
+
+| Document | Contents |
+|----------|----------|
+| [`Todo.md`](Todo.md) | Current backlog: completed cleanup, deleted dead code, and pending work items |
+| [`UX_ENHANCEMENTS_README.md`](UX_ENHANCEMENTS_README.md) | Details of the UI/UX enhancement layer (visual feedback, transitions, memory monitor) |
+
+---
+
 Contributions, issue reports, and feedback are welcome as the project continues to grow.

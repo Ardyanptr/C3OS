@@ -7,3 +7,9 @@
 bin/
 *.elf
 *.hex
+
+# Generated / local artifacts
+compile_commands.json
+pio_build.txt
+pio_build_err.txt
+*.log

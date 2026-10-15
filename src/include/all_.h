@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 
-// #include "BLEAppLib.h"
 #include "ComponentLib.h"
 #include "CoreLib.h"
 #include "EssentialAppLib.h"

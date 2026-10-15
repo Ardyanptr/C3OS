@@ -13,14 +13,13 @@ typedef void (*ServiceFunc)(void*);
 struct ServiceInfo {
     const char* name;
     bool running;
-    size_t stackUsed;  // PASTIKAN TULISANNYA stackUsed
+    size_t stackUsed;
     uint32_t lastHeartbeat;
 };
 
-// Pastikan semua fungsi ini ada di sini agar file lain bisa melihatnya
 int getServiceCount();
 ServiceInfo getServiceInfo(int index);
-bool serviceStopRequested(const char* name);  // Tadi ini mungkin belum ada di header
+bool serviceStopRequested(const char* name);
 
 bool stopService(const char* name);
 bool startServiceByName(const char* name);

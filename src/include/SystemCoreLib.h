@@ -1,7 +1,8 @@
+#pragma once
+
 #include "system16/AT24C256_EEPROM.h"
 #include "system16/BIOS.h"
 #include "system16/app.h"
-#include "system16/capability.h"
 #include "system16/esp826.h"
 #include "system16/memmgmt.h"
 #include "system16/power.h"
