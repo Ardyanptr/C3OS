@@ -1,8 +1,5 @@
 #include "lua_l.h"
 
-#define LUA_32BITS
-#define LUA_C89_NUMBERS
-
 extern "C" {
 #include <lauxlib.h>
 #include <lua.h>
@@ -20,11 +17,12 @@ extern "C" {
 #include "icons/icon.h"
 #include "system16/MemFusion/MemFusion.h"
 
-static bool luaRunning = false;
+#define LUA_C89_NUMBERS
+#define LUA_32BITS
 
+static bool luaRunning = false;
 portMUX_TYPE btnMux = portMUX_INITIALIZER_UNLOCKED;
 
-// Start of panic
 bool halt = true;
 
 void lua_not_respond() {
@@ -39,7 +37,7 @@ void lua_not_respond() {
     display.drawStr(38, 21, "Not Responding");
 
     display.drawStr(26, 30, "App doesn't respond");
-    display.drawStr(26, 36, "Try opneing again!");
+    display.drawStr(26, 36, "Try to reopen");
 
     display.setDrawColor(1);
     display.drawRFrame(26, 39, 24, 9, 3);
@@ -63,7 +61,7 @@ void lua_not_respond() {
     drawMenu();
 }
 
-// End Of Panic
+
 
 const char *lua_stream_reader(lua_State *L, void *data, size_t *size) {
     UARTLuaReader *reader = (UARTLuaReader *)data;
@@ -512,7 +510,7 @@ static lua_State* luaCreateState() {
     return L;
 }
 
-// Main Handler
+ 
 void runLuaScript(const char *path) {
     if (luaRunning) return;
     luaRunning = true;
@@ -573,12 +571,11 @@ void runLuaScript(const char *path) {
         luaRunning = false;
     } else {
         Serial1.println("avr32:fusion-on:64");
-        delay(100); // Beri waktu ESP8266 untuk mount LittleFS
+        delay(100);
 
         File file = LittleFS.open(path, "r");
         if (file) {
             Serial1.println("mem:push:99:start");
-            // Tunggu sampai ESP8266 menjawab STATUS:READY
             delay(50);
 
             while (file.available()) {
@@ -587,7 +584,7 @@ void runLuaScript(const char *path) {
                 if (line.length() > 0) {
                     Serial1.print("mem:push:99:add:");
                     Serial1.println(line);
-                    delay(5); // Jeda sangat singkat
+                    delay(5);
                 }
             }
             file.close();

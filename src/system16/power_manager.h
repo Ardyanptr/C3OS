@@ -13,7 +13,8 @@ class PowerManager {
     enum Profile {
         Performance,
         Balanced,
-        PowerSave
+        PowerSave,
+        UltraSaver
     };
 
     typedef void (*Callback)();
@@ -36,6 +37,13 @@ class PowerManager {
     void setWifiEnabled(bool enable);
 
     void notifyActivity();
+
+    // Park/resume the non-critical background services (CPUTemp, WiFi checks,
+    // pocket detection, heap monitor). Used by UltraSaver and by the AOD loop,
+    // which idles with the radio off. resumeParkedServices() refuses to bring
+    // them back while UltraSaver is active.
+    void parkNonCriticalServices();
+    void resumeParkedServices();
     void setAutoSleepTimeout(uint32_t ms) { _autoSleepMs = ms; }
     uint32_t getAutoSleepTimeout() const { return _autoSleepMs; }
 
@@ -57,6 +65,7 @@ class PowerManager {
     uint32_t _lastActivity = 0;
 
     uint8_t _perfLocks = 0;
+    bool _servicesParked = false;
 
     Callback _preSleep = nullptr;
     Callback _postWake = nullptr;

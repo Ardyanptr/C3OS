@@ -26,6 +26,7 @@ class Settings {
         bool fastboot;
         uint8_t proximityValue;
         bool BLEProximity;
+        bool superSaver;  // keep last before checksum: see legacy layout in .cpp
         uint8_t checksum;
     } __attribute__((packed));
 
@@ -42,6 +43,17 @@ class Settings {
     void apply();
     Data& get();
 
+    // Sleep timeout actually in force: Super Saver caps it, everything else
+    // uses the stored value as-is.
+    uint32_t effectiveSleepTimeout() const;
+
+    // True while Super Saver is on, for the rest of the system to respect.
+    bool isSuperSaver() const { return data.superSaver; }
+
+    static constexpr uint8_t SUPER_SAVER_CPU_MHZ = 80;
+    static constexpr uint8_t SUPER_SAVER_CONTRAST = 90;
+    static constexpr uint32_t SUPER_SAVER_SLEEP_CAP_MS = 20000;
+
    private:
     Data data;
     const char* SETTINGS_PATH = "/settings.bin";
@@ -52,7 +64,7 @@ class Settings {
 
     float animCursorY = 0;
     const uint8_t itemHeight = 12;
-    static const uint8_t totalItems = 12;
+    static const uint8_t totalItems = 13;
 
     volatile bool flagUp = false;
     volatile bool flagDown = false;

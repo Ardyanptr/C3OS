@@ -13,6 +13,8 @@
 #include "config/config.h"
 #include "config/var_declare.h"
 
+#include "system16/power_manager.h"
+
 #include "driver/rtc_io.h"
 #include "esp_sleep.h"
 #include <esp_task_wdt.h>
@@ -25,6 +27,7 @@ extern bool systemUIActive;
 extern uint32_t SLEEP_TIMEOUT;
 extern bool menuEntranceRequested;
 extern void runApp(int index);
+extern PowerManager gPower;
 
 static float flyOffset = 0.0f;
 static bool lastTimerState = false;
@@ -32,15 +35,13 @@ static bool lastTimerState = false;
 static Config sysConfig_lock;
 
 inline void displayAOD() {
-    btnUp.tick();
-
     esp_task_wdt_reset();
 
     display.clearBuffer();
     display.setFontMode(1);
     display.setBitmapMode(1);
 
-    displayEnvironmentAOD();
+    drawEnvironmentAOD();  // scene + pet compose into this buffer
 
     uint32_t now = millis();
     bool isRunning = timerIsRunning();
@@ -89,22 +90,24 @@ inline void displayAOD() {
 }
 
 inline void startAOD() {
-    stopService("Pocket Detection");
     esp_task_wdt_reset();
     yield();
 
     Serial.println("[AOD] Entering AOD");
+
+    // ── Power: drop the radio and park everything the scene does not need.
+    // Timer and EME_RESTART stay alive; everything else resumes on exit
+    // (unless UltraSaver wants it parked for good).
+    WiFiMode_t savedWifi = WiFi.getMode();
+    if (savedWifi != WIFI_OFF) WiFi.mode(WIFI_OFF);
+    gPower.parkNonCriticalServices();
 
     display.setPowerSave(0);
     display.setContrast(1);
     display.setFontMode(1);
     display.setBitmapMode(1);
     display.clearBuffer();
-    display.setFont(u8g2_font_6x10_tr);
-    display.drawStr(20, 32, "AOD READY");
-    display.sendBuffer();
-
-    Serial.println("[AOD] Display sanity check done");
+    display.sendBuffer();  // flush state, no splash text — the scene is next frame
 
     uint8_t pin = Settings::instance->get().aodPin;
     pinMode(pin, INPUT_PULLUP);
@@ -118,16 +121,14 @@ inline void startAOD() {
 
     uint32_t btnPressedAt = 0;
     bool lastBtn = HIGH;
+    bool upWasHigh = true, downWasHigh = true, okWasHigh = true;
 
     flyOffset = 0.0f;
     lastTimerState = false;
+    env_petReset();  // the pet drops into the scene
 
     uint32_t lastTick = millis();
     uint32_t lastDisplayUpdate = 0;
-
-    btnUp.attachClick([]() { /* PET_FEED */ });
-    btnUp.attachDoubleClick([]() { /* PET_SLEEP */ });
-    btnUp.attachMultiClick([]() { /* PET_PLAY */ });
 
     while (true) {
         esp_task_wdt_reset();
@@ -135,12 +136,6 @@ inline void startAOD() {
 
         uint32_t now = millis();
         bool btn = digitalRead(pin);
-
-        static uint32_t lastLog = 0;
-        if (now - lastLog > 200) {
-            Serial.printf("BTN=%d\n", btn);
-            lastLog = now;
-        }
 
         if (lastBtn == HIGH && btn == LOW) {
             btnPressedAt = now;
@@ -154,30 +149,44 @@ inline void startAOD() {
         if (btn == HIGH) btnPressedAt = 0;
         lastBtn = btn;
 
+        // The buttons that are not the wake pin poke the pet instead of
+        // doing nothing (the wake pin is handled as exit above).
+        if (pin != BUTTON_UP) {
+            bool b = digitalRead(BUTTON_UP);
+            if (b == LOW && upWasHigh) env_petReact(PET_FEED);
+            upWasHigh = (b == HIGH);
+        }
+        if (pin != BUTTON_DOWN) {
+            bool b = digitalRead(BUTTON_DOWN);
+            if (b == LOW && downWasHigh) env_petReact(PET_SLEEP);
+            downWasHigh = (b == HIGH);
+        }
+        if (pin != BUTTON_OK) {
+            bool b = digitalRead(BUTTON_OK);
+            if (b == LOW && okWasHigh) env_petReact(PET_PLAY);
+            okWasHigh = (b == HIGH);
+        }
+
         if (now - lastTick >= 1000) {
             timerTick();
             lastTick = now;
         }
 
-        String status = "IDLE";
-        bool fastAnim = (flyOffset > 0.0f) || status.startsWith("PLAY") ||
-                        status.startsWith("GRUMPY") || status.startsWith("EAT");
-        uint32_t refresh = fastAnim ? 33 : 500;
+        // Adaptive pacing: fast only while something is actually animating.
+        uint32_t refresh = (timerIsRunning() || flyOffset > 0.0f) ? 300 : envAnimationInterval();
 
         if (now - lastDisplayUpdate >= refresh) {
             displayAOD();
-
-            // Add enhanced UI feedback during AOD
-            UX::ButtonFeedback::update();
-            UX::MemoryMonitor::drawMemoryBar();
-
             lastDisplayUpdate = now;
         }
 
-        vTaskDelay(1);
+        delay(50);  // instead of a busy vTaskDelay(1): lets the idle task
+                    // (and the automatic light sleep PowerManager configured)
+                    // actually rest between pin polls
     }
 
-    startServiceByName("Pocket Detection");
+    gPower.resumeParkedServices();
+    if (savedWifi != WIFI_OFF) WiFi.mode(savedWifi);
     esp_task_wdt_reset();
 
     display.setContrast(Settings::instance->get().oledContrast);
@@ -190,8 +199,9 @@ static const unsigned char image_user_bits[] = {
 inline void showLockscreen(bool isWake) {
     uint8_t pin = Settings::instance->get().aodPin;
 
-    if (SLEEP_TIMEOUT != Settings::instance->get().sleepTimeout) {
-        SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+    uint32_t wantedSleep = Settings::instance->effectiveSleepTimeout();
+    if (SLEEP_TIMEOUT != wantedSleep) {
+        SLEEP_TIMEOUT = wantedSleep;
 
         display.clearBuffer();
         display.setBitmapMode(1);

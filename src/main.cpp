@@ -1650,7 +1650,7 @@ void loop() {
         isOnSleepMode = true;
     }
 
-    if (WiFi.getMode() == WIFI_AP_STA || WiFi.softAPgetStationNum() > 0) dnsServer.processNextRequest();
+    if (dnsRunning && WiFi.softAPgetStationNum() > 0) dnsServer.processNextRequest();
 
     server.handleClient();
     processSerialInput();

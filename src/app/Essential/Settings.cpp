@@ -2,11 +2,13 @@
 
 #include <WiFi.h>
 #include "esp_task_wdt.h"
+#include "component/liveness.h"
 #include "system16/esp826.h"
 #include "system16/power_manager.h"
 #include "component/hardware/eeprom.h"
 
 extern PowerManager gPower;
+extern uint32_t SLEEP_TIMEOUT;
 
 Settings* Settings::instance = nullptr;
 
@@ -21,6 +23,55 @@ uint8_t calculateChecksum(const Settings::Data& d) {
         crc ^= ptr[i];
     }
     return crc;
+}
+
+// Exact layout of settings saved before the superSaver flag existed. Kept only
+// so devices upgrade their stored settings instead of dropping to defaults.
+struct __attribute__((packed)) LegacySettings {
+    uint32_t signature;
+    bool bluetooth;
+    bool wifi;
+    uint8_t wifiPower;
+    uint8_t oledContrast;
+    uint32_t sleepTimeout;
+    uint8_t aodPin;
+    uint8_t memFusion;
+    uint16_t cpuFrequency;
+    bool gameMode;
+    bool fastboot;
+    uint8_t proximityValue;
+    bool BLEProximity;
+    uint8_t checksum;
+};
+
+static bool legacyChecksumValid(const uint8_t* raw) {
+    uint8_t crc = 0;
+    for (size_t i = 0; i < sizeof(LegacySettings) - 1; i++) {
+        crc ^= raw[i];
+    }
+    return ((const LegacySettings*)raw)->signature == 0x53455431 && raw[sizeof(LegacySettings) - 1] == crc;
+}
+
+static void migrateFromLegacy(Settings::Data& d, const uint8_t* raw) {
+    const LegacySettings* l = (const LegacySettings*)raw;
+
+    d.signature = l->signature;
+    d.bluetooth = l->bluetooth;
+    d.wifi = l->wifi;
+    d.wifiPower = l->wifiPower;
+    d.oledContrast = l->oledContrast;
+    d.sleepTimeout = l->sleepTimeout;
+    d.aodPin = l->aodPin;
+    d.memFusion = l->memFusion;
+    d.cpuFrequency = l->cpuFrequency;
+    d.gameMode = l->gameMode;
+    d.fastboot = l->fastboot;
+    d.proximityValue = l->proximityValue;
+    d.BLEProximity = l->BLEProximity;
+    d.superSaver = false;
+    d.checksum = calculateChecksum(d);
+
+    Serial.println("Settings migrated from legacy layout");
 }
 
 void Settings::onUp() { instance->flagUp = true; }
@@ -63,14 +114,24 @@ void Settings::load() {
     if (!success && LittleFS.exists(SETTINGS_PATH)) {
         File file = LittleFS.open(SETTINGS_PATH, "r");
         if (file) {
-            if (file.read((uint8_t*)&data, sizeof(Data)) == sizeof(Data)) {
-                bool sigValid = (data.signature == 0x53455431);
-                bool crcValid = (data.checksum == calculateChecksum(data));
-                if (sigValid && crcValid) {
+            uint8_t raw[sizeof(Settings::Data)] = {0};
+            size_t got = file.read(raw, sizeof(Settings::Data));
+
+            if (got == sizeof(Settings::Data)) {
+                const Settings::Data* candidate = (const Settings::Data*)raw;
+                if (candidate->signature == 0x53455431 && candidate->checksum == calculateChecksum(*candidate)) {
+                    memcpy(&data, raw, sizeof(Settings::Data));
                     success = true;
                     Serial.println("Settings loaded from LittleFS");
                 }
             }
+
+            if (!success && got == sizeof(LegacySettings) && legacyChecksumValid(raw)) {
+                migrateFromLegacy(data, raw);
+                success = true;
+                save();  // rewrite in the current layout
+            }
+
             file.close();
         }
     }
@@ -89,6 +150,7 @@ void Settings::load() {
         data.fastboot = false;
         data.proximityValue = 100;
         data.BLEProximity = true;
+        data.superSaver = false;
         data.checksum = calculateChecksum(data);
         Serial.println("Settings initialized to defaults");
     }
@@ -121,13 +183,31 @@ bool Settings::loadFromEEPROM() {
     uint8_t buffer[BLOCK_SIZE];
     if (readLastValidBlock(buffer, BLOCK_SIZE - 1)) {
         Data* candidate = (Data*)buffer;
-        if (candidate->signature == 0x53455431 && candidate->checksum == calculateChecksum(*candidate)) {
+        // superSaver is a bool: a value above 1 means the block still uses the
+        // legacy layout and the byte there is the old checksum.
+        if (candidate->signature == 0x53455431 && candidate->superSaver <= 1 &&
+            candidate->checksum == calculateChecksum(*candidate)) {
             memcpy(&data, buffer, sizeof(Data));
             writeEEPROM(SETTINGS_MARKER_ADDR, SETTINGS_MARKER_VAL);
             return true;
         }
+
+        if (legacyChecksumValid(buffer)) {
+            migrateFromLegacy(data, buffer);
+            writeEEPROM(SETTINGS_MARKER_ADDR, SETTINGS_MARKER_VAL);
+            save();  // rewrite in the current layout
+            return true;
+        }
     }
     return false;
+}
+
+uint32_t Settings::effectiveSleepTimeout() const {
+    uint32_t timeout = max<uint32_t>(10000u, data.sleepTimeout);
+    if (data.superSaver) {
+        timeout = min<uint32_t>(timeout, SUPER_SAVER_SLEEP_CAP_MS);
+    }
+    return timeout;
 }
 
 void Settings::loadSettings() {
@@ -136,11 +216,17 @@ void Settings::loadSettings() {
 }
 
 void Settings::apply() {
-    display.setContrast(data.oledContrast);
+    const bool saver = data.superSaver;
 
-    uint32_t safeTimeout = max<uint32_t>(10000u, data.sleepTimeout);
+    // Super Saver overrides the user's own power choices; everything else
+    // keeps using them as configured.
+    display.setContrast(saver ? min<uint16_t>(data.oledContrast, SUPER_SAVER_CONTRAST)
+                              : data.oledContrast);
 
-    if (data.wifi) {
+    if (saver) {
+        WiFi.mode(WIFI_OFF);
+        btStop();
+    } else if (data.wifi) {
         WiFi.mode(WIFI_STA);
         WiFi.setTxPower((wifi_power_t)(data.wifiPower / 5));
     } else {
@@ -155,9 +241,17 @@ void Settings::apply() {
         Serial1.println("avr32:fusion-on:64");
     }
 
-    setCpuFrequencyMhz(data.cpuFrequency);
+    setCpuFrequencyMhz(saver ? SUPER_SAVER_CPU_MHZ : data.cpuFrequency);
 
-    gPower.setProfile(data.gameMode ? PowerManager::Performance : PowerManager::Balanced);
+    if (saver) {
+        gPower.setProfile(PowerManager::UltraSaver);
+    } else if (data.gameMode) {
+        gPower.setProfile(PowerManager::Performance);
+    } else {
+        gPower.setProfile(PowerManager::Balanced);
+    }
+
+    SLEEP_TIMEOUT = effectiveSleepTimeout();
 }
 
 void Settings::draw() {
@@ -176,8 +270,9 @@ void Settings::draw() {
     targetScrollY = min(targetScrollY, (float)maxScroll);
     scrollY += (targetScrollY - scrollY) * 0.2f;
 
-    const char* labels[] = {"Bluetooth", "WiFi Status", "TX Power", "Brightness", "Sleep", "AOD Wake",
-                            "Mem Fusion", "CPU Freq", "Game Mode", "Fastboot", "Proximity", "Find My"};
+    const char* labels[] = {"Bluetooth",  "WiFi Status", "TX Power",  "Brightness", "Sleep",      "AOD Wake",
+                            "Mem Fusion", "CPU Freq",    "Game Mode", "Fastboot",   "Proximity",  "Find My",
+                            "Super Saver"};
 
     display.setDrawColor(1);
     display.drawRBox(0, (int)(animCursorY - scrollY) + 1, 128, 12, 2);
@@ -221,7 +316,9 @@ void Settings::draw() {
             snprintf(buf, sizeof(buf), "%dmm", data.proximityValue);
         } else if (i == 11) {
             strcpy(buf, data.BLEProximity ? "ON" : "OFF");
-        } 
+        } else if (i == 12) {
+            strcpy(buf, data.superSaver ? "ON" : "OFF");
+        }
 
         if (editing && i == cursor) {
             char editBuf[30];
@@ -277,12 +374,17 @@ void Settings::handleInput() {
 
     if (flagOK) {
         flagOK = false;
-        if (cursor == 0 || cursor == 1 || cursor == 8 || cursor == 9) {
+        // Toggle rows: no value editing, one click flips the state
+        if (cursor == 0 || cursor == 1 || cursor == 8 || cursor == 9 || cursor == 11 || cursor == 12) {
             if (cursor == 0) data.bluetooth = !data.bluetooth;
             if (cursor == 1) data.wifi = !data.wifi;
             if (cursor == 8) data.gameMode = !data.gameMode;
             if (cursor == 9) data.fastboot = !data.fastboot;
             if (cursor == 11) data.BLEProximity = !data.BLEProximity;
+            if (cursor == 12) {
+                data.superSaver = !data.superSaver;
+                Liveness::Notifications::show(data.superSaver ? "Super Saver: ON" : "Super Saver: OFF");
+            }
 
             save();
             apply();

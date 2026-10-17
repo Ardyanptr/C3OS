@@ -9,6 +9,7 @@ const byte DNS_PORT = 53;
 
 DNSServer dnsServer;
 WebServer server(80);
+bool dnsRunning = false;
 
 #include "component/vkeyboard.h"
 #include "component/website.h"
@@ -44,7 +45,7 @@ void runHotspot() {
         delay(1500);
 
         IPAddress apIP = WiFi.softAPIP();
-        dnsServer.start(DNS_PORT, "*", apIP);
+        dnsRunning = dnsServer.start(DNS_PORT, "*", apIP);
 
         server.on("/", []() {
             server.send(200, "text/html", portalHTML);

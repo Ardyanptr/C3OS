@@ -4,9 +4,11 @@
 #include <U8g2lib.h>
 #include <WiFi.h>
 
+#include "UI/dialog.h"
 #include "app/Essential/Settings.h"
 #include "component/service.h"
 #include "emergency/eme_shutdown.h"
+#include "system16/oled_animation.h"
 
 #include "system16/esp826.h"
 #include "system16/state.h"
@@ -17,15 +19,20 @@
 
 extern void drawMenu();
 
+// Teardown + deep sleep. The device is not powered off: it sleeps and wakes on
+// the ACTION button. Services are stopped, the radios are cut and the ESP32-C3
+// goes into deep sleep with the ACTION pin armed as wake source.
 inline void safe_shutdown() {
     sendCommand("avr32:blink");
+
+    animateShutdown("Shutting down...");
+
     stopAllService();
 
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
     btStop();
 
-    sendCommand("avr32:blink");
     sendCommand("hold");
     sendCommand("avr32:deep-sleep-manual");
     sendCommand("avr32:power-down-all");
@@ -55,28 +62,20 @@ inline void safe_shutdown() {
 }
 
 inline void shutdown_now() {
-    display.clearDisplay();
+    DialogChoice choice = confirmDialog("Shutdown?", "Enters deep sleep - not a full power off",
+                                        "ACTION wakes the device again");
 
-    display.setFontMode(1);
-    display.setBitmapMode(1);
-
-    display.drawRFrame(28, 19, 76, 30, 4);
-    display.drawRBox(26, 17, 76, 30, 4);
-
-    display.setDrawColor(2);
-
-    display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(31, 26, "Proceed Shutdown?");
-
-    display.drawRFrame(36, 33, 25, 9, 3);
-    display.drawRFrame(65, 33, 25, 9, 3);
-
-    display.drawStr(45, 40, "OK");
-    display.drawStr(76, 40, "C");
-
-    display.sendBuffer();
-
-    btnOK.attachClick([]() { safe_shutdown(); });
-    btnOK.attachDoubleClick([]() { drawMenu(); });
-    btnOK.attachLongPressStart([]() { show_eme_shutdown(); });
+    switch (choice) {
+        case DialogChoice::CONFIRM:
+            safe_shutdown();
+            break;
+        case DialogChoice::EMERGENCY:
+            show_eme_shutdown();
+            break;
+        case DialogChoice::CANCEL:
+        default:
+            // ACTION is never re-bound by the dialog, the action menu just
+            // resumes where it left off
+            break;
+    }
 }

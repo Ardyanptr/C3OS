@@ -4,7 +4,9 @@
 #include <U8g2lib.h>
 #include <WiFi.h>
 
+#include "UI/dialog.h"
 #include "component/service.h"
+#include "system16/oled_animation.h"
 #include "system16/esp826.h"
 #include "system16/state.h"
 
@@ -12,6 +14,7 @@
 
 extern void drawMenu();
 
+// Cuts everything down and deep sleeps. Wakes on GPIO 3 (the ACTION button).
 inline void eme_shutdown_run() {
     boot_mode = BOOT_NORMAL;
 
@@ -25,9 +28,8 @@ inline void eme_shutdown_run() {
     delay(50);
 
     sendCommand("avr32:deep-sleep-manual");
-    display.setContrast(0);
-    display.setPowerSave(1);
-    delay(200);
+
+    fadeOutOLED();
 
     pinMode(GPIO_NUM_3, INPUT_PULLUP);
 
@@ -35,24 +37,12 @@ inline void eme_shutdown_run() {
     esp_deep_sleep_start();
 }
 
+// Emergency power-off, reached from the shutdown dialog with a long press.
+// Services stay alive until the user actually confirms here.
 inline void show_eme_shutdown() {
-    stopAllService();
-    WiFi.mode(WIFI_OFF);
+    DialogChoice choice = confirmDialog("Power off?", "Cuts power immediately", "Nothing is saved");
 
-    display.clearBuffer();
-
-    display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(2, 27, "Click OK to immediately lost");
-
-    display.drawRBox(36, 30, 23, 9, 3);
-    display.drawRFrame(63, 30, 33, 9, 3);
-
-    display.setDrawColor(2);
-    display.drawStr(43, 37, "OK");
-    display.drawStr(68, 37, "CANCEL");
-
-    display.sendBuffer();
-
-    btnOK.attachClick([]() { eme_shutdown_run(); });
-    btnOK.attachClick([]() { startService(); WiFi.mode(WIFI_STA); drawMenu(); });
+    if (choice == DialogChoice::CONFIRM) {
+        eme_shutdown_run();
+    }
 }

@@ -679,7 +679,6 @@ void SecurityKernel::logEvent(const char* event) {
 }
 
 CorruptionType SecurityKernel::detectCorruptionType() {
-    // Check various indicators to determine corruption type
     if (!checkFilesystem()) {
         return CORRUPT_FILESYSTEM;
     }

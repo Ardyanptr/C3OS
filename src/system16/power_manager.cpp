@@ -1,10 +1,18 @@
 #include "power_manager.h"
 #include "component/liveness.h"
+#include "component/service.h"
 #include <Arduino.h>
 #include <driver/gpio.h>
 #include <esp_bt.h>
 #include <esp_sleep.h>
 #include <esp_system.h>
+
+// Background services that are not worth their RAM/CPU while UltraSaver is on.
+// Timer and EME_RESTART stay: the first drives the clock, the second is the
+// emergency reset combo.
+static const char* const PARKED_SERVICES[] = {"CPUTemp",       "WiFiCheck",   "WiFiMonitor",
+                                              "Pocket Detection", "ESP8266 Check", "Heap Allocator"};
+static const uint8_t PARKED_COUNT = sizeof(PARKED_SERVICES) / sizeof(PARKED_SERVICES[0]);
 
 static inline void cfg_pm(uint32_t max_mhz, uint32_t min_mhz, bool light_sleep) {
     esp_pm_config_esp32c3_t pm = {};
@@ -29,6 +37,13 @@ void PowerManager::setProfile(Profile profile) {
     _profile = profile;
     applyPmConfig();
     applyWifiPolicy();
+
+    if (profile == UltraSaver) {
+        btStop();
+        parkNonCriticalServices();
+    } else if (_servicesParked) {
+        resumeParkedServices();
+    }
 }
 
 void PowerManager::applyPmConfig() {
@@ -40,6 +55,7 @@ void PowerManager::applyPmConfig() {
             cfg_pm(160, 40, true);
             break;
         case PowerSave:
+        case UltraSaver:
             cfg_pm(80, 40, true);
             break;
     }
@@ -56,12 +72,29 @@ void PowerManager::applyWifiPolicy() {
             ps = WIFI_PS_MIN_MODEM;
             break;
         case PowerSave:
+        case UltraSaver:
             ps = WIFI_PS_MAX_MODEM;
             break;
     }
 
     esp_wifi_set_ps(ps);
     WiFi.setSleep(ps != WIFI_PS_NONE);
+}
+
+void PowerManager::parkNonCriticalServices() {
+    for (uint8_t i = 0; i < PARKED_COUNT; i++) {
+        if (stopService(PARKED_SERVICES[i])) {
+            _servicesParked = true;
+        }
+    }
+}
+
+void PowerManager::resumeParkedServices() {
+    if (_profile == UltraSaver) return;  // UltraSaver wants them parked
+    for (uint8_t i = 0; i < PARKED_COUNT; i++) {
+        startServiceByName(PARKED_SERVICES[i]);
+    }
+    _servicesParked = false;
 }
 
 void PowerManager::setWifiSleep(bool enable) {
@@ -95,20 +128,34 @@ void PowerManager::loop() {
 
     if (_autoSleepMs == 0 || _perfLocks > 0) return;
 
-    // Smart Dimming: Lower power after 15s of inactivity
-    if (idle > 15000 && !_isDimmed) {
+    const bool saver = (_profile == UltraSaver);
+
+    // Smart Dimming: lower power after inactivity (much sooner in UltraSaver)
+    const uint32_t dimAfterMs = saver ? 5000 : 15000;
+    if (idle > dimAfterMs && !_isDimmed) {
         _isDimmed = true;
         if (_displayDim) _displayDim(true);
     }
 
-    // Auto WiFi Shutdown: Turn off WiFi if idle and not connected for 3 mins
+    // Auto WiFi Shutdown: turn off WiFi if idle and not connected
     static uint32_t lastWifiCheck = 0;
     if (now - lastWifiCheck > 10000) {
         lastWifiCheck = now;
-        if (WiFi.getMode() != WIFI_OFF && WiFi.status() != WL_CONNECTED && idle > 180000) {
+        const uint32_t wifiKillAfterMs = saver ? 20000 : 180000;
+        if (WiFi.getMode() != WIFI_OFF && WiFi.status() != WL_CONNECTED && idle > wifiKillAfterMs) {
             setWifiEnabled(false);
             Liveness::Notifications::show("WiFi: Power Saved");
             Serial.println("[PM] Auto WiFi shutdown due to inactivity");
+        }
+    }
+
+    // UltraSaver parks the background services once they are up. They start
+    // after settings are applied during boot, so retry until one is found.
+    if (saver && !_servicesParked) {
+        static uint32_t lastParkTry = 0;
+        if (now - lastParkTry > 3000) {
+            lastParkTry = now;
+            parkNonCriticalServices();
         }
     }
 

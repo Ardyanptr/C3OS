@@ -4,6 +4,7 @@
 #include <U8g2lib.h>
 #include <WiFi.h>
 
+#include "UI/dialog.h"
 #include "component/service.h"
 #include "emergency/eme_restart.h"
 #include "system16/state.h"
@@ -32,28 +33,17 @@ inline void safe_restart() {
 }
 
 inline void restart_now() {
-    display.clearDisplay();
+    DialogChoice choice = confirmDialog("Restart?", "Reboots the device", "Long-press OK: force restart");
 
-    display.setFontMode(1);
-    display.setBitmapMode(1);
-
-    display.drawRFrame(28, 19, 76, 30, 4);
-    display.drawRBox(26, 17, 76, 30, 4);
-
-    display.setDrawColor(2);
-
-    display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(31, 26, "Proceed Restart?");
-
-    display.drawRFrame(36, 33, 25, 9, 3);
-    display.drawRFrame(65, 33, 25, 9, 3);
-
-    display.drawStr(45, 40, "OK");
-    display.drawStr(76, 40, "C");
-
-    display.sendBuffer();
-
-    btnOK.attachClick([]() { safe_restart(); });
-    btnOK.attachDoubleClick([]() { drawMenu(); });
-    btnOK.attachLongPressStart([]() { show_eme_restart(); });
+    switch (choice) {
+        case DialogChoice::CONFIRM:
+            safe_restart();
+            break;
+        case DialogChoice::EMERGENCY:
+            show_eme_restart();
+            break;
+        case DialogChoice::CANCEL:
+        default:
+            break;
+    }
 }

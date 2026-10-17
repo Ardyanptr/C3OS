@@ -560,7 +560,7 @@ void fast_boot() {
 
     syncProgress(0.95);
     setting.loadSettings();
-    SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+    SLEEP_TIMEOUT = Settings::instance->effectiveSleepTimeout();
     cpuFrequency = Settings::instance->get().cpuFrequency;
     setCpuFrequencyMhz(cpuFrequency);
 
@@ -744,7 +744,7 @@ void full_boot() {
     lnx_log("Applying system settings...", 0.80f);
     setting.loadSettings();
     esp_task_wdt_reset();  // Reset watchdog after loading settings
-    SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+    SLEEP_TIMEOUT = Settings::instance->effectiveSleepTimeout();
     cpuFrequency = Settings::instance->get().cpuFrequency;
     setCpuFrequencyMhz(cpuFrequency);
     esp_task_wdt_reset();  // Reset watchdog after setting CPU frequency
@@ -863,7 +863,7 @@ void safe_boot() {
     {
         SB_BEGIN("Settings");
         setting.loadSettings();
-        SLEEP_TIMEOUT = Settings::instance->get().sleepTimeout;
+        SLEEP_TIMEOUT = Settings::instance->effectiveSleepTimeout();
         uint16_t cpuMhz = Settings::instance->get().cpuFrequency;
         SB_END("OK");
         SB_NOTE("Sleep=%lus CPU=%dMHz", (unsigned long)(SLEEP_TIMEOUT / 1000), cpuMhz);

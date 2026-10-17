@@ -187,6 +187,297 @@ static void env_circle(int16_t cx, int16_t cy, int16_t r) {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  Pet — the little creature living on the ground line.
+//  Walks, blinks, wags its tail, hops, hurries in the rain and
+//  sleeps with zzz at night. Buttons in the AOD loop poke it.
+// ─────────────────────────────────────────────────────────────
+enum PetCmd : uint8_t { PET_FEED = 0, PET_PLAY, PET_SLEEP };
+enum PetState : uint8_t { PET_ST_IDLE = 0, PET_ST_WALK, PET_ST_HOP, PET_ST_EAT, PET_ST_ASLEEP };
+
+static const int8_t PET_HOP_H[] = {0, -2, -4, -4, -2, 0};
+static const uint8_t PET_BODY_W[] = {1, 2, 3, 3, 3, 2, 2};  // half-width per row, feet -> top
+
+static uint8_t pet_state = PET_ST_WALK;
+static float pet_x = 64.0f;
+static int8_t pet_dir = 1;
+static uint32_t pet_stateStart = 0;
+static uint32_t pet_nextStep = 0;
+static uint32_t pet_nextAction = 0;
+static uint32_t pet_nextBlink = 0;
+static uint32_t pet_blinkUntil = 0;
+static uint8_t pet_walkSteps = 0;
+static uint8_t pet_walkGoal = 8;
+static uint8_t pet_hopFrame = 0;
+static uint32_t pet_nextHopFrame = 0;
+static int16_t pet_dropY = -48;   // entry: starts high in the sky, eases down
+static bool pet_entrying = true;
+static uint32_t pet_heartUntil = 0;
+
+inline void env_petReset() {
+    pet_state = PET_ST_WALK;
+    pet_x = 64.0f;
+    pet_dir = 1;
+    pet_walkSteps = 0;
+    pet_walkGoal = 8;
+    pet_stateStart = millis();
+    pet_nextStep = 0;
+    pet_nextAction = millis() + 3000;
+    pet_nextBlink = millis() + 2000;
+    pet_blinkUntil = 0;
+    pet_hopFrame = 0;
+    pet_dropY = -48;
+    pet_entrying = true;
+    pet_heartUntil = 0;
+}
+
+// Reactions triggered by the AOD buttons (the wake pin itself is excluded).
+inline void env_petReact(uint8_t cmd) {
+    if (pet_entrying) return;
+    uint32_t now = millis();
+
+    if (cmd == PET_SLEEP) {
+        pet_state = PET_ST_ASLEEP;
+        pet_stateStart = now;
+        return;
+    }
+
+    if (pet_state == PET_ST_ASLEEP) {  // feed/play wake the pet up
+        pet_state = PET_ST_IDLE;
+        pet_stateStart = now;
+    }
+
+    if (cmd == PET_FEED) {
+        pet_state = PET_ST_EAT;
+        pet_stateStart = now;
+        pet_heartUntil = now + 1600;
+    } else if (cmd == PET_PLAY) {
+        pet_state = PET_ST_HOP;
+        pet_hopFrame = 0;
+        pet_nextHopFrame = now;
+        pet_stateStart = now;
+    }
+}
+
+static void env_petUpdate(bool night, bool hurry) {
+    uint32_t now = millis();
+
+    if (pet_entrying) {
+        pet_dropY = (int16_t)(pet_dropY * 0.55f);
+        if (pet_dropY > -1) {
+            pet_dropY = 0;
+            pet_entrying = false;
+            pet_stateStart = now;
+            pet_nextStep = now;
+        }
+        return;
+    }
+
+    // night: the pet dozes off by itself (but finishes a hop/meal first)
+    if (night && (pet_state == PET_ST_IDLE || pet_state == PET_ST_WALK)) {
+        pet_state = PET_ST_ASLEEP;
+        pet_stateStart = now;
+    }
+
+    switch (pet_state) {
+        case PET_ST_ASLEEP:
+            if (!night && now - pet_stateStart > 8000) {
+                pet_state = PET_ST_IDLE;
+                pet_stateStart = now;
+                pet_nextAction = now + 2000;
+            }
+            break;
+
+        case PET_ST_EAT:
+            if (now - pet_stateStart > 1300) {
+                pet_state = PET_ST_IDLE;
+                pet_stateStart = now;
+                pet_nextAction = now + 1500;
+            }
+            break;
+
+        case PET_ST_HOP:
+            if (now >= pet_nextHopFrame) {
+                pet_hopFrame++;
+                pet_nextHopFrame = now + 220;
+                if (pet_hopFrame >= sizeof(PET_HOP_H)) {
+                    pet_hopFrame = 0;
+                    pet_state = PET_ST_IDLE;
+                    pet_stateStart = now;
+                    pet_nextAction = now + 2500;
+                }
+            }
+            break;
+
+        case PET_ST_WALK:
+            if (now >= pet_nextStep) {
+                pet_nextStep = now + (hurry ? 260 : 380);
+                pet_x += pet_dir * 2;
+                pet_walkSteps++;
+                if (pet_x >= 118) pet_dir = -1;
+                if (pet_x <= 10) pet_dir = 1;
+                if (pet_walkSteps >= pet_walkGoal) {
+                    pet_walkSteps = 0;
+                    pet_walkGoal = 5 + (env_rand() % 8);
+                    pet_state = PET_ST_IDLE;
+                    pet_stateStart = now;
+                    pet_nextAction = now + 3500 + (env_rand() % 4500);
+                }
+            }
+            break;
+
+        case PET_ST_IDLE:
+        default:
+            if (now >= pet_nextAction) {
+                if ((env_rand() % 10) < 4) {
+                    pet_state = PET_ST_HOP;
+                    pet_hopFrame = 0;
+                    pet_nextHopFrame = now;
+                } else {
+                    pet_state = PET_ST_WALK;
+                    pet_walkSteps = 0;
+                    pet_walkGoal = 5 + (env_rand() % 8);
+                    pet_nextStep = now;
+                }
+                pet_stateStart = now;
+            }
+            break;
+    }
+
+    // blink — never while asleep, those eyes are already shut
+    if (pet_state != PET_ST_ASLEEP) {
+        if (pet_blinkUntil && now >= pet_blinkUntil) {
+            pet_blinkUntil = 0;
+        } else if (!pet_blinkUntil && now >= pet_nextBlink) {
+            pet_blinkUntil = now + 170;
+            pet_nextBlink = now + 2400 + (env_rand() % 2600);
+        }
+    }
+}
+
+static void env_drawPet() {
+    uint32_t now = millis();
+    int16_t cx = (int16_t)pet_x;
+    int16_t feetY = GROUND_Y - 1;
+
+    if (pet_entrying) {
+        feetY += pet_dropY;
+    } else if (pet_state == PET_ST_HOP) {
+        feetY += PET_HOP_H[pet_hopFrame];
+    }
+
+    display.setDrawColor(1);
+
+    if (pet_state != PET_ST_ASLEEP) {
+        // body: filled blob standing on the ground line
+        for (uint8_t l = 0; l < 7; l++) {
+            for (int8_t dx = -PET_BODY_W[l]; dx <= PET_BODY_W[l]; dx++)
+                env_pixel(cx + dx, feetY - l);
+        }
+
+        // ears
+        env_pixel(cx - 2, feetY - 7);
+        env_pixel(cx + 2, feetY - 7);
+        env_pixel(cx - 3, feetY - 6);
+        env_pixel(cx + 3, feetY - 6);
+
+        // face — punched out of the white body
+        display.setDrawColor(0);
+        if (pet_blinkUntil) {  // closed: two slits instead of two dots
+            env_pixel(cx - 3, feetY - 4);
+            env_pixel(cx - 2, feetY - 4);
+            env_pixel(cx + 2, feetY - 4);
+            env_pixel(cx + 3, feetY - 4);
+        } else {
+            env_pixel(cx - 2, feetY - 4);
+            env_pixel(cx + 2, feetY - 4);
+        }
+        env_pixel(cx, feetY - 3);  // nose
+        display.setDrawColor(1);
+
+        // whiskers
+        for (int8_t s = -1; s <= 1; s += 2) {
+            env_pixel(cx + s * 4, feetY - 3);
+            env_pixel(cx + s * 5, feetY - 4);
+        }
+
+        // tail — flicks between two poses every 400ms
+        int8_t d = pet_dir;
+        if (((now / 400) & 1) == 0) {
+            env_pixel(cx + d * 4, feetY - 2);
+            env_pixel(cx + d * 5, feetY - 3);
+            env_pixel(cx + d * 5, feetY - 4);
+            env_pixel(cx + d * 4, feetY - 5);
+        } else {
+            env_pixel(cx + d * 4, feetY - 1);
+            env_pixel(cx + d * 5, feetY - 2);
+            env_pixel(cx + d * 6, feetY - 2);
+        }
+
+        // stride foot while walking
+        if (pet_state == PET_ST_WALK) {
+            env_pixel(cx + ((pet_walkSteps & 1) ? 2 : -2), feetY);
+        }
+    } else {
+        // curled up as a flat loaf, eyes shut, tail wrapped, zzz rising
+        for (uint8_t l = 0; l < 3; l++) {
+            for (int8_t dx = -3; dx <= 3; dx++) env_pixel(cx + dx, feetY - l);
+        }
+        env_pixel(cx - 2, feetY - 3);  // folded ears
+        env_pixel(cx + 2, feetY - 3);
+
+        display.setDrawColor(0);
+        env_pixel(cx - 3, feetY - 2);
+        env_pixel(cx - 2, feetY - 2);
+        env_pixel(cx + 2, feetY - 2);
+        env_pixel(cx + 3, feetY - 2);
+        env_pixel(cx, feetY - 1);
+        display.setDrawColor(1);
+
+        env_pixel(cx + 4, feetY - 1);  // tail wrapped around
+        env_pixel(cx + 5, feetY - 2);
+        env_pixel(cx + 6, feetY - 2);
+        env_pixel(cx + 5, feetY - 3);
+
+        for (uint8_t i = 0; i < 2; i++) {
+            uint32_t ph = (now + i * 900) % 2700;
+            if (ph > 1800) continue;
+            int16_t zx = cx + 6 + (int16_t)(ph / 700);
+            int16_t zy = feetY - 6 - (int16_t)(ph / 300);
+            env_pixel(zx, zy);
+            env_pixel(zx + 1, zy);
+            env_pixel(zx + 1, zy - 1);
+            env_pixel(zx, zy - 2);
+            env_pixel(zx + 1, zy - 2);
+        }
+    }
+
+    // heart floating up while the pet is being fed
+    if (now < pet_heartUntil) {
+        int16_t hx = cx - 2;
+        int16_t hy = feetY - 9 - (int16_t)((1600 - (pet_heartUntil - now)) / 200);
+        env_pixel(hx + 1, hy);
+        env_pixel(hx + 3, hy);
+        for (int8_t dx = 0; dx < 5; dx++) env_pixel(hx + dx, hy + 1);
+        for (int8_t dx = 0; dx < 5; dx++) env_pixel(hx + dx, hy + 2);
+        env_pixel(hx + 1, hy + 3);
+        env_pixel(hx + 2, hy + 3);
+        env_pixel(hx + 3, hy + 3);
+        env_pixel(hx + 2, hy + 4);
+    }
+}
+
+// Frame pacing for the AOD loop: fast only while something is actually
+// moving, medium during precipitation, slow (cheap) when the scene is calm.
+inline uint32_t envAnimationInterval() {
+    if (pet_entrying) return 200;
+    if (env_inTransition) return 300;
+    if (pet_blinkUntil) return 300;
+    if (pet_state == PET_ST_WALK || pet_state == PET_ST_HOP || pet_state == PET_ST_EAT) return 300;
+    if (env_weather == WEATHER_RAIN || env_weather == WEATHER_SNOW) return 500;
+    return 1000;
+}
+
+// ─────────────────────────────────────────────────────────────
 //  Weather picker
 // ─────────────────────────────────────────────────────────────
 static WeatherType env_pickWeather() {
@@ -415,8 +706,8 @@ static void env_checkWeatherChange() {
     }
 
     if (env_inTransition) {
-        env_transition += 4; // advance transition counter
-        if (env_transition >= 128) {
+        env_transition += 8; // advance transition counter (fast: the AOD runs
+        if (env_transition >= 128) { // at burst pace while dissolving)
             env_weather = env_nextWeather;
             env_inTransition = false;
             env_transition = 0;
@@ -425,9 +716,11 @@ static void env_checkWeatherChange() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Main AOD draw call — call this from your AOD loop
+//  Main AOD draw call — composes ONE frame into the caller's
+//  buffer. The caller clears and flushes, so this never touches
+//  the buffer lifecycle itself (a single I2C transfer per frame).
 // ─────────────────────────────────────────────────────────────
-inline void displayEnvironmentAOD() {
+inline void drawEnvironmentAOD() {
     esp_task_wdt_reset();
     env_checkWeatherChange();
 
@@ -444,7 +737,6 @@ inline void displayEnvironmentAOD() {
     const bool isSunny = (activeWeather == WEATHER_SUNNY);
 
     env_initGrass();
-    display.clearBuffer();
     display.setDrawColor(1);
 
     float f = (float)env_frame;
@@ -503,7 +795,10 @@ inline void displayEnvironmentAOD() {
         }
     }
 
-    display.sendBuffer();
+    // ── Pet ──────────────────────────────────────────────────
+    env_petUpdate(isNight, isRain);
+    env_drawPet();
+
     env_frame++;
 }
 
