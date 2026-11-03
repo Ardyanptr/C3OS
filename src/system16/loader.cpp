@@ -30,6 +30,7 @@ bool loadConfig() {
 
     sysConfig.anr_active = doc["system"]["anr_active"];
     sysConfig.system_ui_active = doc["system"]["system_ui_active"];
+    sysConfig.use_login = doc["system"]["use_login"] | true;
     configFile_UI.close();
 
     File configFile_System = LittleFS.open("/cfg/system_config.json", "r");
@@ -89,6 +90,7 @@ bool saveConfig() {
     JsonObject sysObj = doc.createNestedObject("system");
     sysObj["anr_active"] = sysConfig.anr_active;
     sysObj["system_ui_active"] = sysConfig.system_ui_active;
+    sysObj["use_login"] = sysConfig.use_login;
 
     if (serializeJson(doc, configFile_UI) == 0) {
         Serial.println("Failed to serialize UI config json");

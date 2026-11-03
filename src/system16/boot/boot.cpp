@@ -606,7 +606,11 @@ void fast_boot() {
     display.sendBuffer();
     boot_count = 0;
 
-    showLockscreen(true);
+    if (sysConfig.use_login) {
+        pendingLockscreen = true;
+    } else {
+        drawMenu();
+    }
 }
 
 void safe_boot();
@@ -773,7 +777,11 @@ void full_boot() {
 
     boot_count = 0;
     UX::TransitionEffects::fadeOut();
-    showLockscreen(true);
+    if (sysConfig.use_login) {
+        pendingLockscreen = true;
+    } else {
+        drawMenu();
+    }
 }
 
 void safe_boot() {
@@ -954,7 +962,11 @@ void safe_boot() {
 
     delay(200);
 
-    drawMenu();
+    if (sysConfig.use_login) {
+        pendingLockscreen = true;
+    } else {
+        drawMenu();
+    }
 }
 
 void boot() {

@@ -7,6 +7,7 @@
     },
     "system": {
         "anr_active": false,
-        "system_ui_active": true
+        "system_ui_active": true,
+        "use_login": false
     }
 }

@@ -16,6 +16,7 @@ extern "C" {
 #include "esp_task_wdt.h"
 #include "icons/icon.h"
 #include "system16/MemFusion/MemFusion.h"
+#include "system16/shutdown.h"
 
 #define LUA_C89_NUMBERS
 #define LUA_32BITS
@@ -60,8 +61,6 @@ void lua_not_respond() {
 
     drawMenu();
 }
-
-
 
 const char *lua_stream_reader(lua_State *L, void *data, size_t *size) {
     UARTLuaReader *reader = (UARTLuaReader *)data;
@@ -469,6 +468,11 @@ int l_c3_get_cpu(lua_State *L) {
     return 1;
 }
 
+int l_c3_shutdown(lua_State *L) {
+    safe_shutdown();
+    return 0;
+}
+
 static lua_State* luaCreateState() {
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
@@ -507,6 +511,7 @@ static lua_State* luaCreateState() {
     lua_register(L, "c3_get_weather", l_c3_get_weather);
     lua_register(L, "c3_get_uptime", l_c3_get_uptime);
     lua_register(L, "c3_get_cpu", l_c3_get_cpu);
+    lua_register(L, "c3_shutdown", l_c3_shutdown);
     return L;
 }
 

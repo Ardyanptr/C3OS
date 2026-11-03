@@ -18,6 +18,7 @@ struct Config {
     bool init_service;
     bool ignore_hardware;
     bool no_init;
+    bool use_login;
 
     uint8_t user_pin[4];
 };

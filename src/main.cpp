@@ -84,7 +84,6 @@ AT24C256 eep;
 Settings setting;
 PowerManager gPower;
 DFRobot_VL53L0X sensor;
-// End of Initializer
 
 RTC_DATA_ATTR boot_mode_t boot_mode = BOOT_NORMAL;
 
@@ -180,7 +179,7 @@ void ui_watchdog(void* arg) {
 
 void enable_pm() {
     esp_pm_config_esp32c3_t pm = {
-        .max_freq_mhz = 160, .min_freq_mhz = 40, .light_sleep_enable = false};
+        .max_freq_mhz = 160, .min_freq_mhz = 40, .light_sleep_enable = true};
 
     esp_pm_configure(&pm);
 }
@@ -197,7 +196,7 @@ const char* menuItems[] = {
     "Factory Reset", "Check Integrity", "Online Story",   "Heap Monitor",  "Stopwatch",
     "BenchMyESP",    "Minecraft",       "Stardew Valley", "Keyboard Emu",  "C3 Burner",
     "WiFi Telnet",   "Doom GL",         "File Manager",   "Store Manager", "Timer",
-    "Update",        "Radar Maker",     "Prism Launcher", "Crash Manager", "DummyApp"
+    "Update",        "Radar Maker",     "Prism Launcher", "Crash Manager"
 };
 
 const int menuCount = sizeof(menuItems) / sizeof(menuItems[0]);
@@ -472,7 +471,6 @@ void drawMenu() {
     display.setFont(u8g2_font_7x14_tr);
     display.clearBuffer();
 
-    if (systemUIActive) Liveness::Ambient::updateAndDraw(display);
     if (!skipButtonInit) initMenuButton();
 
     float currentOffset;
@@ -506,7 +504,6 @@ void drawMenu() {
 }
 
 void updateScroll() {
-    // Skip state saving - no persistent ID tracking
     const int visibleItemsCount = 3;
     int newScrollOffset = targetScrollOffset;
 
@@ -589,9 +586,6 @@ void runApp(int index) {
     appRunning = true;
     currentApp = index;
 
-    // Wait for the app's task to finish (foreground changes away from this pid)
-    // The app task handles its own button input - do NOT tick OneButton here
-    // to avoid race conditions with the app's own button handling.
     while (ProcessManager::instance().getForegroundId() == pid) {
         if (digitalRead(BUTTON_ACTION) == LOW) {
             unsigned long start = millis();
@@ -605,8 +599,6 @@ void runApp(int index) {
             }
         }
 
-        // Process cleanup while waiting – update() removes finished Process
-        // entries and resets foregroundId so the loop can exit.
         ProcessManager::instance().update();
 
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -617,7 +609,6 @@ void runApp(int index) {
     appRunning = false;
     currentApp = -1;
 
-    // Detach any stale app callbacks before re-initializing menu
     detachCallback();
     animateExit(app.name);
 
@@ -1622,7 +1613,7 @@ void loop() {
         return;
     }
 
-    if (pendingLockscreen) {
+    if (pendingLockscreen && sysConfig.use_login) {
         pendingLockscreen = false;
         showLockscreen(true);
     }
